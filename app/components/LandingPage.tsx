@@ -1,0 +1,504 @@
+import React from 'react';
+import { Event, Product, Category, User } from '../lib/db';
+import LazyImage from './ui/LazyImage';
+import {
+  Trophy, Swords, Shield, MapPin, Calendar, Users,
+  ShoppingBag, Mail, Phone, ChevronRight, ArrowRight,
+  Ticket, Star, Package, ExternalLink,
+} from 'lucide-react';
+
+interface LandingPageProps {
+  events: Event[];
+  products: Product[];
+  categories: Category[];
+  currentUser: User | null;
+  onDaftarClick: () => void;
+  setView: (view: string) => void;
+}
+
+const SectionLabel = ({ children }: { children: React.ReactNode }) => (
+  <span className="inline-flex items-center gap-2 text-[11px] font-black tracking-widest text-brand-red uppercase">
+    <span className="w-4 h-0.5 bg-brand-red rounded-full" />
+    {children}
+  </span>
+);
+
+export default function LandingPage({
+  events, products, categories, currentUser, onDaftarClick, setView,
+}: LandingPageProps) {
+  return (
+    <div className="w-full flex flex-col bg-white overflow-x-hidden font-sans">
+
+      {/* ── HERO ──────────────────────────────────────────────── */}
+      <section className="relative overflow-hidden bg-white py-20 sm:py-28 px-6 border-b border-slate-100">
+        {/* BG blobs */}
+        <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-brand-blue/[0.04] rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 -z-0" />
+        <div className="absolute bottom-0 left-0 w-80 h-80 bg-brand-red/[0.04] rounded-full blur-3xl translate-y-1/2 -translate-x-1/3 -z-0" />
+
+        <div className="relative max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-16 items-center">
+          {/* Left */}
+          <div className="lg:col-span-6 xl:col-span-7 flex flex-col items-start gap-6 animate-fade-in">
+            <div className="inline-flex items-center gap-2 bg-brand-blue/8 border border-brand-blue/15 px-4 py-1.5 rounded-full">
+              <span className="w-1.5 h-1.5 rounded-full bg-brand-red animate-pulse-slow" />
+              <span className="text-[11px] font-black uppercase tracking-widest text-brand-blue">
+                Akademi Sabuk Hitam & Prestasi
+              </span>
+            </div>
+
+            <h1 className="text-4xl sm:text-5xl xl:text-6xl font-black tracking-tight leading-[1.08] text-slate-900">
+              Temukan Disiplin,<br />
+              Bangun{' '}
+              <span className="relative">
+                <span className="relative z-10 text-brand-blue">Mental Juara</span>
+                <span className="absolute bottom-1 left-0 right-0 h-2 bg-brand-blue/10 rounded -z-0" />
+              </span>
+            </h1>
+
+            <p className="text-slate-500 text-base sm:text-lg max-w-lg leading-relaxed font-medium">
+              V-Dojang Taekwondo melatih fisik, kedisiplinan diri, dan integritas moral. Kurikulum standar Kukkiwon untuk segala jenjang umur dibimbing langsung oleh Sabeum bersertifikasi nasional.
+            </p>
+
+            {/* Stats row */}
+            <div className="flex gap-6 text-center">
+              {[['200+', 'Anggota Aktif'], ['8+', 'Tahun Berdiri'], ['3', 'Dojang Cabang']].map(([num, label]) => (
+                <div key={label}>
+                  <p className="text-2xl font-black text-brand-blue">{num}</p>
+                  <p className="text-[11px] text-slate-400 font-semibold uppercase tracking-wide">{label}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex flex-wrap gap-3 mt-1">
+              <button
+                onClick={onDaftarClick}
+                className="flex items-center gap-2 bg-brand-blue hover:bg-brand-blue-hover text-white text-sm font-black uppercase tracking-wider px-7 py-3.5 rounded-xl shadow-lg shadow-brand-blue/25 hover:shadow-xl hover:shadow-brand-blue/30 transition-all duration-200"
+              >
+                Daftar Sekarang
+                <ArrowRight size={16} />
+              </button>
+              <button
+                onClick={() => document.getElementById('about-section')?.scrollIntoView({ behavior: 'smooth' })}
+                className="flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 hover:border-slate-300 text-sm font-bold px-7 py-3.5 rounded-xl transition-all duration-200"
+              >
+                Pelajari Program
+              </button>
+            </div>
+          </div>
+
+          {/* Right - Hero Image */}
+          <div className="lg:col-span-6 xl:col-span-5 flex justify-center stagger-2 animate-fade-in">
+            <div className="relative w-full max-w-md">
+              {/* Decorative ring */}
+              <div className="absolute -inset-3 bg-gradient-to-br from-brand-blue/10 to-brand-red/10 rounded-[2rem] -z-10" />
+              <div className="relative w-full aspect-[4/3] bg-slate-100 rounded-3xl overflow-hidden shadow-2xl group border border-white/50">
+                <img
+                  src="/hero-img.jpg"
+                  alt="Taekwondo Training V-Dojang"
+                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-950/70 via-slate-950/10 to-transparent" />
+
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── PROGRAM CARDS ─────────────────────────────────────── */}
+      <section id="about-section" className="py-20 px-6 bg-[#f8faff]">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-14">
+            <SectionLabel>Program Unggulan</SectionLabel>
+            <h2 className="text-3xl sm:text-4xl font-black text-slate-900 mt-3">Kurikulum Berstandar Internasional</h2>
+            <p className="text-slate-500 mt-3 max-w-xl mx-auto text-sm font-medium leading-relaxed">
+              Tiga pilar program latihan terintegrasi yang membentuk atlet berprestasi sekaligus generasi berkarakter.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {[
+              {
+                icon: <Trophy size={22} />,
+                color: 'bg-amber-50 text-amber-600 border-amber-100',
+                accent: 'bg-amber-600',
+                title: 'Prestasi & Turnamen',
+                desc: 'Program pembinaan atlet untuk kejuaraan daerah dan nasional dengan bimbingan teknik kyorugi (tarung) modern.',
+                delay: 'stagger-1',
+              },
+              {
+                icon: <Swords size={22} />,
+                color: 'bg-brand-red/10 text-brand-red border-brand-red/10',
+                accent: 'bg-brand-red',
+                title: 'Teknik & Poomsae',
+                desc: 'Pembelajaran seni jurus (poomsae) yang berfokus pada ketepatan gerakan, keseimbangan, dan kekuatan nafas.',
+                delay: 'stagger-2',
+              },
+              {
+                icon: <Shield size={22} />,
+                color: 'bg-brand-blue/10 text-brand-blue border-brand-blue/10',
+                accent: 'bg-brand-blue',
+                title: 'Pilar Kedisiplinan',
+                desc: 'Melatih kejujuran, sportivitas, etika moral, dan membangun rasa percaya diri anak sejak tingkatan sabuk dasar.',
+                delay: 'stagger-3',
+              },
+            ].map(item => (
+              <div
+                key={item.title}
+                className={`bg-white rounded-2xl p-7 border border-slate-100 card-hover animate-fade-in ${item.delay} group`}
+              >
+                <div className={`inline-flex w-12 h-12 rounded-2xl items-center justify-center border ${item.color} mb-5`}>
+                  {item.icon}
+                </div>
+                <h3 className="text-lg font-black text-slate-900 mb-2">{item.title}</h3>
+                <p className="text-slate-500 text-sm leading-relaxed font-medium">{item.desc}</p>
+                <div className={`h-0.5 ${item.accent} w-0 group-hover:w-12 transition-all duration-300 rounded-full mt-5`} />
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── TOKO PRODUK ───────────────────────────────────────── */}
+      <section id="shop-section" className="py-20 px-6 bg-white border-y border-slate-100">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4 mb-14">
+            <div>
+              <SectionLabel>Toko Resmi Club</SectionLabel>
+              <h2 className="text-3xl sm:text-4xl font-black text-slate-900 mt-3">Peralatan Bela Diri & Dobok</h2>
+              <p className="text-slate-500 mt-2 font-medium text-sm max-w-lg">
+                Lengkapi kebutuhan latihan dengan seragam dobok resmi Kukkiwon, body protector, dan perlengkapan latihan lainnya.
+              </p>
+            </div>
+            {currentUser && (
+              <button
+                onClick={() => setView('dashboard')}
+                className="flex items-center gap-2 px-5 py-2.5 border border-slate-200 rounded-xl text-sm font-bold text-slate-600 hover:border-brand-blue/30 hover:text-brand-blue transition shrink-0"
+              >
+                <ShoppingBag size={15} />
+                Lihat Semua
+              </button>
+            )}
+          </div>
+
+          <div className="space-y-12">
+            {categories.map(cat => {
+              const catProducts = products.filter(p => p.categoryId === cat.id);
+              if (catProducts.length === 0) return null;
+              return (
+                <div key={cat.id} className="space-y-5">
+                  <div className="flex items-center gap-3">
+                    <Package size={14} className="text-slate-400" />
+                    <h3 className="font-black text-[11px] text-slate-400 uppercase tracking-widest">{cat.name}</h3>
+                    <div className="flex-1 h-px bg-slate-100" />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+                    {catProducts.map(prod => (
+                      <div
+                        key={prod.id}
+                        className="bg-white border border-slate-100 rounded-2xl overflow-hidden card-hover group flex flex-col"
+                      >
+                        {/* Product image */}
+                        <div className="relative w-full aspect-square bg-slate-50 overflow-hidden">
+                          {prod.image ? (
+                            <LazyImage
+                              src={prod.image}
+                              alt={prod.name}
+                              className="w-full h-full"
+                              fallback={<Package size={32} className="text-slate-300" />}
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <Package size={36} className="text-slate-300" />
+                            </div>
+                          )}
+                          {/* Stock badge */}
+                          <div className={`absolute top-3 right-3 px-2 py-0.5 rounded-full text-[9px] font-black uppercase ${
+                            prod.stock > 0 ? 'bg-emerald-500 text-white' : 'bg-rose-500 text-white'
+                          }`}>
+                            {prod.stock > 0 ? `Stok ${prod.stock}` : 'Habis'}
+                          </div>
+                        </div>
+
+                        {/* Info */}
+                        <div className="p-4 flex flex-col flex-1">
+                          <h4 className="font-extrabold text-slate-900 text-sm leading-snug mb-1">{prod.name}</h4>
+                          <p className="text-[11px] text-slate-400 leading-relaxed line-clamp-2 mb-3 flex-1 font-medium">{prod.description}</p>
+                          <div className="flex items-center justify-between pt-3 border-t border-slate-100">
+                            <span className="font-black text-brand-blue text-sm">
+                              Rp {prod.price.toLocaleString('id-ID')}
+                            </span>
+                            <button
+                              onClick={() => setView(currentUser ? 'dashboard' : 'login')}
+                              disabled={prod.stock === 0}
+                              className="flex items-center gap-1 px-3 py-1.5 bg-brand-red hover:bg-brand-red-hover disabled:bg-slate-200 disabled:text-slate-400 text-white text-[10px] font-black uppercase tracking-wider rounded-lg transition"
+                            >
+                              {prod.stock === 0 ? 'Habis' : (currentUser ? 'Beli' : 'Masuk & Beli')}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+
+            {products.length === 0 && (
+              <div className="text-center py-16 border border-dashed border-slate-200 rounded-2xl">
+                <Package size={32} className="text-slate-300 mx-auto mb-3" />
+                <p className="text-slate-400 font-semibold text-sm">Produk belum tersedia saat ini.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+
+      {/* ── DOJANG CARDS ─────────────────────────────────────── */}
+      <section id="dojang-section" className="py-20 px-6 bg-[#f8faff]">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-14">
+            <SectionLabel>Tempat Latihan</SectionLabel>
+            <h2 className="text-3xl sm:text-4xl font-black text-slate-900 mt-3">Dojang & Lokasi Latihan</h2>
+            <p className="text-slate-500 mt-3 max-w-xl mx-auto text-sm font-medium">
+              Pilih cabang dojang latihan terdekat untuk mengikuti jadwal rutin pendaftaran.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {[
+              {
+                badge: 'Pusat Senayan',
+                name: 'Dojang Merdeka Jakarta',
+                address: 'Jl. Merdeka No. 12, Senayan, Jakarta Pusat',
+                schedule: 'Selasa & Kamis (16.00)',
+                coach: 'Budi Santoso, DAN IV',
+                gradient: 'from-brand-blue/8 to-brand-blue/3',
+                accent: 'brand-blue',
+              },
+              {
+                badge: 'Depok Cabang',
+                name: 'Dojang Garuda Depok',
+                address: 'GOR Depok, Jl. Margonda Raya No. 45',
+                schedule: 'Rabu & Sabtu (15.30)',
+                coach: 'Siti Rahma, DAN III',
+                gradient: 'from-violet-50 to-violet-50/20',
+                accent: 'violet-600',
+              },
+              {
+                badge: 'Bekasi Cabang',
+                name: 'Dojang Harapan Bekasi',
+                address: 'Harapan Indah Blok B/14, Bekasi Barat',
+                schedule: 'Jumat & Minggu (16.00)',
+                coach: 'Andi Wijaya, DAN V',
+                gradient: 'from-brand-red/8 to-brand-red/3',
+                accent: 'brand-red',
+              },
+            ].map((d, i) => (
+              <div key={d.name} className={`bg-gradient-to-br ${d.gradient} border border-slate-100 rounded-2xl p-6 card-hover flex flex-col animate-fade-in stagger-${i + 1}`}>
+                <div className="flex justify-between items-center mb-5">
+                  <div className="w-10 h-10 rounded-xl bg-white border border-slate-100 shadow-sm flex items-center justify-center">
+                    <Shield size={18} className="text-brand-blue" />
+                  </div>
+                  <span className="bg-white border border-slate-100 text-slate-600 text-[9px] font-black uppercase px-2.5 py-1 rounded-full shadow-sm">
+                    {d.badge}
+                  </span>
+                </div>
+
+                <h4 className="font-black text-lg text-slate-900 mb-1 leading-snug">{d.name}</h4>
+
+                <div className="space-y-2 my-4 flex-1">
+                  <div className="flex items-start gap-2 text-xs text-slate-500 font-medium">
+                    <MapPin size={13} className="shrink-0 mt-0.5 text-slate-400" />
+                    <span>{d.address}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
+                    <Calendar size={13} className="shrink-0 text-slate-400" />
+                    <span>{d.schedule}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
+                    <Users size={13} className="shrink-0 text-slate-400" />
+                    <span>{d.coach}</span>
+                  </div>
+                </div>
+
+                <button
+                  onClick={onDaftarClick}
+                  className="w-full py-2.5 bg-brand-blue hover:bg-brand-blue-hover text-white rounded-xl text-xs font-black uppercase tracking-wider transition flex items-center justify-center gap-2 mt-2"
+                >
+                  Pilih Dojang Ini
+                  <ChevronRight size={14} />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ── EVENTS ───────────────────────────────────────────── */}
+      <section id="events-section" className="py-20 px-6 bg-white border-t border-slate-100">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-14">
+            <SectionLabel>Agenda Club</SectionLabel>
+            <h2 className="text-3xl sm:text-4xl font-black text-slate-900 mt-3">Kegiatan Terdekat & UKT</h2>
+            <p className="text-slate-500 mt-3 max-w-xl mx-auto text-sm font-medium">
+              Lihat agenda turnamen, seminar, serta Ujian Kenaikan Tingkat (UKT) sabuk resmi yang akan datang.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {events.length > 0 ? (
+              events.map((evt, i) => (
+                <div
+                  key={evt.id}
+                  className={`bg-white border border-slate-100 rounded-2xl overflow-hidden card-hover flex flex-col animate-fade-in stagger-${(i % 3) + 1}`}
+                >
+                  {/* Color header bar */}
+                  <div className="h-1.5 bg-gradient-to-r from-brand-blue to-brand-red" />
+                  <div className="p-6 flex flex-col flex-1">
+                    <div className="flex justify-between items-center mb-4">
+                      <div className="flex items-center gap-1.5 bg-brand-blue/8 text-brand-blue px-2.5 py-1 rounded-full">
+                        <Star size={10} />
+                        <span className="text-[10px] font-black uppercase">{evt.category}</span>
+                      </div>
+                      <div className="flex items-center gap-1 text-brand-blue">
+                        <Ticket size={13} />
+                        <span className="font-black text-sm">Rp {evt.price.toLocaleString('id-ID')}</span>
+                      </div>
+                    </div>
+
+                    <h4 className="font-extrabold text-slate-900 text-base mb-3 leading-snug flex-1">{evt.name}</h4>
+
+                    <div className="space-y-1.5 mb-5">
+                      <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
+                        <Calendar size={12} className="text-slate-400" />
+                        <span>{evt.date || '--'}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
+                        <MapPin size={12} className="text-slate-400" />
+                        <span>{evt.location || '--'}</span>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => setView(currentUser ? 'dashboard' : 'login')}
+                      className="w-full py-2.5 border border-brand-blue/30 text-brand-blue font-bold rounded-xl text-xs hover:bg-brand-blue hover:text-white hover:border-brand-blue transition duration-200 uppercase tracking-wider flex items-center justify-center gap-1.5"
+                    >
+                      {currentUser ? 'Daftar Event' : 'Masuk & Daftar'}
+                      <ExternalLink size={12} />
+                    </button>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="col-span-3 text-center py-16 border border-dashed border-slate-200 rounded-2xl">
+                <Calendar size={32} className="text-slate-300 mx-auto mb-3" />
+                <p className="text-slate-400 font-semibold text-sm">Tidak ada agenda terdekat saat ini.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+
+      {/* ── CTA BANNER ───────────────────────────────────────── */}
+      <section className="py-12 px-6">
+        <div className="max-w-7xl mx-auto relative overflow-hidden rounded-3xl bg-[#090681] p-10 sm:p-14">
+          {/* Decorative elements */}
+          <div className="absolute top-0 right-0 w-96 h-96 bg-white/5 rounded-full blur-3xl" />
+          <div className="absolute -bottom-20 -left-20 w-80 h-80 bg-brand-red/20 rounded-full blur-3xl" />
+
+          <div className="relative flex flex-col md:flex-row justify-between items-center gap-8">
+            <div className="text-center md:text-left space-y-3">
+              <div className="inline-flex items-center gap-2 bg-white/10 border border-white/20 px-3 py-1 rounded-full">
+                <Star size={11} className="text-amber-400" />
+                <span className="text-[11px] font-black uppercase tracking-widest text-white/80">Bergabung Sekarang</span>
+              </div>
+              <h2 className="text-2xl sm:text-3xl font-black text-white leading-tight">
+                Ayo Mulai Latihan Taekwondo Anda
+              </h2>
+              <p className="text-white/60 text-sm max-w-md font-medium">
+                Pendaftaran online praktis, verifikasi pembayaran cepat, dan pantau riwayat sabuk Anda secara digital.
+              </p>
+            </div>
+
+            <button
+              onClick={onDaftarClick}
+              className="shrink-0 flex items-center gap-2.5 bg-white hover:bg-slate-50 text-slate-900 text-sm font-black uppercase tracking-wider px-8 py-4 rounded-2xl shadow-xl hover:shadow-2xl transition-all duration-200"
+            >
+              Daftar Anggota Sekarang
+              <ArrowRight size={16} />
+            </button>
+          </div>
+        </div>
+      </section>
+
+      {/* ── FOOTER ───────────────────────────────────────────── */}
+      <footer className="bg-slate-950 text-slate-400 py-14 px-6 border-t border-slate-800">
+        <div className="max-w-7xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-10">
+          {/* Brand */}
+          <div className="space-y-4 sm:col-span-2 lg:col-span-1">
+            <div className="flex items-center gap-2.5">
+              <img src="/v-dojang.jpeg" alt="V-Dojang Logo" className="w-9 h-9 rounded-xl object-cover" />
+              <div>
+                <span className="font-black text-white text-sm">V-DOJANG</span>
+                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Taekwondo Club</p>
+              </div>
+            </div>
+            <p className="text-xs leading-relaxed font-medium text-slate-500">
+              Sistem Informasi Manajemen Club Taekwondo — pendaftaran terintegrasi, UKT, turnamen, dan kelengkapan bela diri.
+            </p>
+          </div>
+
+          {/* Links */}
+          <div>
+            <h5 className="font-black text-white text-xs mb-5 uppercase tracking-widest">Aktivitas</h5>
+            <ul className="space-y-2.5 text-xs font-medium">
+              {['Latihan Kyorugi (Sparring)', 'Latihan Poomsae (Jurus)', 'Ujian Kenaikan Sabuk', 'Kompetisi Prestasi'].map(item => (
+                <li key={item} className="flex items-center gap-2 hover:text-slate-300 transition cursor-default">
+                  <span className="w-1 h-1 rounded-full bg-slate-600" />
+                  {item}
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {/* Contact */}
+          <div>
+            <h5 className="font-black text-white text-xs mb-5 uppercase tracking-widest">Hubungi Kami</h5>
+            <ul className="space-y-2.5 text-xs font-medium">
+              <li className="flex items-center gap-2">
+                <Mail size={12} className="text-slate-500 shrink-0" />
+                info@vdojang.com
+              </li>
+              <li className="flex items-center gap-2">
+                <Phone size={12} className="text-slate-500 shrink-0" />
+                +62 812-3456-7890
+              </li>
+              <li className="flex items-start gap-2">
+                <MapPin size={12} className="text-slate-500 shrink-0 mt-0.5" />
+                GOR Merdeka, Senayan, Jakarta
+              </li>
+            </ul>
+          </div>
+
+          {/* Payment */}
+          <div>
+            <h5 className="font-black text-white text-xs mb-5 uppercase tracking-widest">Metode Bayar</h5>
+            <ul className="space-y-2.5 text-xs font-medium">
+              {['Transfer Bank Mandiri / BCA / BNI', 'Review Bukti Bayar Instan', 'Konfirmasi via Dashboard'].map(item => (
+                <li key={item} className="flex items-center gap-2">
+                  <span className="w-1 h-1 rounded-full bg-slate-600" />
+                  {item}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+
+        <div className="max-w-7xl mx-auto border-t border-slate-800 mt-12 pt-8 flex flex-col sm:flex-row justify-between items-center gap-2 text-xs text-slate-600 font-medium">
+          <span>© {new Date().getFullYear()} V-Dojang Taekwondo Club. All rights reserved.</span>
+          <span className="flex items-center gap-1">Built with <span className="text-brand-red">♥</span> for Indonesian Taekwondo</span>
+        </div>
+      </footer>
+    </div>
+  );
+}

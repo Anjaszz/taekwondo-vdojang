@@ -1,0 +1,1513 @@
+diff --git a/app/components/DashboardAdmin.tsx b/app/components/DashboardAdmin.tsx
+new file mode 100644
+index 0000000..982073c
+--- /dev/null
++++ b/app/components/DashboardAdmin.tsx
+@@ -0,0 +1,1507 @@
++import React, { useState, useEffect } from 'react';
++import { db, User, Transaction, Product, Category, Event, SystemSettings } from '../lib/db';
++
++interface DashboardAdminProps {
++  adminUser: User;
++  onUpdateAdminProfile: (updatedUser: User) => void;
++  onLogout: () => void;
++}
++
++type TabType =
++  | 'ringkasan'
++  | 'pesanan'
++  | 'produk'
++  | 'kategori'
++  | 'laporan-anggota'
++  | 'laporan-aksesoris'
++  | 'laporan-event'
++  | 'profile-setting'
++  | 'harga-setting';
++
++export default function DashboardAdmin({
++  adminUser,
++  onUpdateAdminProfile,
++  onLogout,
++}: DashboardAdminProps) {
++  // Collapsible Sidebar State
++  const [sidebarOpen, setSidebarOpen] = useState(true);
++  const [activeTab, setActiveTab] = useState<TabType>('ringkasan');
++  const [showLaporanMenu, setShowLaporanMenu] = useState(true);
++
++  // Loaded DB data
++  const [users, setUsers] = useState<User[]>([]);
++  const [transactions, setTransactions] = useState<Transaction[]>([]);
++  const [products, setProducts] = useState<Product[]>([]);
++  const [categories, setCategories] = useState<Category[]>([]);
++  const [events, setEvents] = useState<Event[]>([]);
++  const [settings, setSettings] = useState<SystemSettings | null>(null);
++
++  // Modal / Interaction states
++  const [loading, setLoading] = useState(false);
++  const [rejectingTx, setRejectingTx] = useState<Transaction | null>(null);
++  const [rejectReason, setRejectReason] = useState('');
++  
++  // Product CRUD states
++  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
++  const [prodName, setProdName] = useState('');
++  const [prodPrice, setProdPrice] = useState(0);
++  const [prodStock, setProdStock] = useState(0);
++  const [prodDesc, setProdDesc] = useState('');
++  const [prodCatId, setProdCatId] = useState('');
++
++  // Category CRUD states
++  const [editingCategory, setEditingCategory] = useState<Category | null>(null);
++  const [catName, setCatName] = useState('');
++
++  // Event CRUD states
++  const [editingEvent, setEditingEvent] = useState<Event | null>(null);
++  const [evtName, setEvtName] = useState('');
++  const [evtDate, setEvtDate] = useState('');
++  const [evtLoc, setEvtLoc] = useState('');
++  const [evtPrice, setEvtPrice] = useState(0);
++  const [evtCat, setEvtCat] = useState('');
++
++  // Profile Form States
++  const [adminName, setAdminName] = useState(adminUser.name);
++  const [adminEmail, setAdminEmail] = useState(adminUser.email);
++  const [adminPassword, setAdminPassword] = useState(adminUser.password || '');
++
++  // Settings Form States
++  const [regFee, setRegFee] = useState(0);
++  const [bankName, setBankName] = useState('');
++  const [bankAcc, setBankAcc] = useState('');
++  const [bankRecipient, setBankRecipient] = useState('');
++
++  // Load Database Values
++  const loadAdminData = async () => {
++    const [us, txs, prods, cats, evts, setts] = await Promise.all([
++      db.getUsers(),
++      db.getTransactions(),
++      db.getProducts(),
++      db.getCategories(),
++      db.getEvents(),
++      db.getSettings(),
++    ]);
++
++    setUsers(us);
++    setTransactions(txs);
++    setProducts(prods);
++    setCategories(cats);
++    setEvents(evts);
++    setSettings(setts);
++
++    if (cats.length > 0 && !prodCatId) {
++      setProdCatId(cats[0].id);
++    }
++
++    if (setts) {
++      setRegFee(setts.registrationFee);
++      setBankName(setts.bankName);
++      setBankAcc(setts.bankAccount);
++      setBankRecipient(setts.bankRecipient);
++    }
++  };
++
++  useEffect(() => {
++    loadAdminData();
++  }, []);
++
++  // Accept Transaction Handler
++  const handleAcceptTransaction = async (txId: string) => {
++    if (!confirm('Apakah Anda yakin ingin menyetujui pembayaran ini?')) return;
++    setLoading(true);
++    try {
++      await db.updateTransactionStatus(txId, 'Berhasil');
++      await loadAdminData();
++    } catch (err) {
++      console.error(err);
++      alert('Gagal menyetujui pembayaran.');
++    } finally {
++      setLoading(false);
++    }
++  };
++
++  // Reject Transaction Handler
++  const handleOpenRejectModal = (tx: Transaction) => {
++    setRejectingTx(tx);
++    setRejectReason('');
++  };
++
++  const handleRejectTransaction = async (e: React.FormEvent) => {
++    e.preventDefault();
++    if (!rejectingTx || !rejectReason.trim()) return;
++
++    setLoading(true);
++    try {
++      await db.updateTransactionStatus(rejectingTx.id, 'Ditolak', rejectReason);
++      setRejectingTx(null);
++      await loadAdminData();
++    } catch (err) {
++      console.error(err);
++      alert('Gagal menolak pembayaran.');
++    } finally {
++      setLoading(false);
++    }
++  };
++
++  // Product Add/Edit Handle
++  const handleSaveProduct = async (e: React.FormEvent) => {
++    e.preventDefault();
++    setLoading(true);
++
++    try {
++      const prodsList = [...products];
++      if (editingProduct) {
++        const idx = prodsList.findIndex(p => p.id === editingProduct.id);
++        if (idx !== -1) {
++          prodsList[idx] = {
++            ...editingProduct,
++            name: prodName,
++            price: Number(prodPrice),
++            stock: Number(prodStock),
++            description: prodDesc,
++            categoryId: prodCatId,
++          };
++        }
++      } else {
++        prodsList.push({
++          id: 'prod-' + Date.now(),
++          name: prodName,
++          price: Number(prodPrice),
++          stock: Number(prodStock),
++          description: prodDesc,
++          categoryId: prodCatId,
++        });
++      }
++
++      await db.saveProducts(prodsList);
++      setEditingProduct(null);
++      setProdName('');
++      setProdPrice(0);
++      setProdStock(0);
++      setProdDesc('');
++      await loadAdminData();
++    } catch (err) {
++      console.error(err);
++      alert('Gagal menyimpan produk.');
++    } finally {
++      setLoading(false);
++    }
++  };
++
++  const handleEditProductClick = (prod: Product) => {
++    setEditingProduct(prod);
++    setProdName(prod.name);
++    setProdPrice(prod.price);
++    setProdStock(prod.stock);
++    setProdDesc(prod.description);
++    setProdCatId(prod.categoryId);
++  };
++
++  const handleDeleteProduct = async (id: string) => {
++    if (!confirm('Apakah Anda yakin ingin menghapus produk ini?')) return;
++    try {
++      const filtered = products.filter(p => p.id !== id);
++      await db.saveProducts(filtered);
++      await loadAdminData();
++    } catch (err) {
++      console.error(err);
++    }
++  };
++
++  // Category Add/Edit Handle
++  const handleSaveCategory = async (e: React.FormEvent) => {
++    e.preventDefault();
++    if (!catName.trim()) return;
++
++    setLoading(true);
++    try {
++      const catsList = [...categories];
++      if (editingCategory) {
++        const idx = catsList.findIndex(c => c.id === editingCategory.id);
++        if (idx !== -1) {
++          catsList[idx].name = catName;
++        }
++      } else {
++        catsList.push({
++          id: 'cat-' + Date.now(),
++          name: catName,
++        });
++      }
++
++      await db.saveCategories(catsList);
++      setEditingCategory(null);
++      setCatName('');
++      await loadAdminData();
++    } catch (err) {
++      console.error(err);
++    } finally {
++      setLoading(false);
++    }
++  };
++
++  const handleDeleteCategory = async (id: string) => {
++    if (!confirm('Hapus kategori ini?')) return;
++    try {
++      const filtered = categories.filter(c => c.id !== id);
++      await db.saveCategories(filtered);
++      await loadAdminData();
++    } catch (err) {
++      console.error(err);
++    }
++  };
++
++  // Event Add/Edit Handle
++  const handleSaveEvent = async (e: React.FormEvent) => {
++    e.preventDefault();
++    if (!evtName || !evtDate || !evtLoc) return;
++
++    setLoading(true);
++    try {
++      const evtsList = [...events];
++      if (editingEvent) {
++        const idx = evtsList.findIndex(ev => ev.id === editingEvent.id);
++        if (idx !== -1) {
++          evtsList[idx] = {
++            ...editingEvent,
++            name: evtName,
++            date: evtDate,
++            location: evtLoc,
++            price: Number(evtPrice),
++            category: evtCat,
++          };
++        }
++      } else {
++        evtsList.push({
++          id: 'evt-' + Date.now(),
++          name: evtName,
++          date: evtDate,
++          location: evtLoc,
++          price: Number(evtPrice),
++          category: evtCat,
++        });
++      }
++
++      await db.saveEvents(evtsList);
++      setEditingEvent(null);
++      setEvtName('');
++      setEvtDate('');
++      setEvtLoc('');
++      setEvtPrice(0);
++      setEvtCat('Semua Tingkatan');
++      await loadAdminData();
++    } catch (err) {
++      console.error(err);
++    } finally {
++      setLoading(false);
++    }
++  };
++
++  const handleDeleteEvent = async (id: string) => {
++    if (!confirm('Hapus event ini?')) return;
++    try {
++      const filtered = events.filter(e => e.id !== id);
++      await db.saveEvents(filtered);
++      await loadAdminData();
++    } catch (err) {
++      console.error(err);
++    }
++  };
++
++  // Profile Save Handle
++  const handleSaveProfile = async (e: React.FormEvent) => {
++    e.preventDefault();
++    setLoading(true);
++    try {
++      const updatedAdmin: User = {
++        ...adminUser,
++        name: adminName,
++        email: adminEmail,
++        password: adminPassword,
++      };
++
++      await db.updateUser(updatedAdmin);
++      onUpdateAdminProfile(updatedAdmin);
++      alert('Profil admin berhasil diperbarui!');
++    } catch (err) {
++      console.error(err);
++    } finally {
++      setLoading(false);
++    }
++  };
++
++  // Settings Save Handle
++  const handleSaveSettings = async (e: React.FormEvent) => {
++    e.preventDefault();
++    setLoading(true);
++    try {
++      const newSettings: SystemSettings = {
++        registrationFee: Number(regFee),
++        bankName,
++        bankAccount: bankAcc,
++        bankRecipient,
++      };
++
++      await db.saveSettings(newSettings);
++      alert('Pengaturan pendaftaran dan bank berhasil diperbarui!');
++      await loadAdminData();
++    } catch (err) {
++      console.error(err);
++    } finally {
++      setLoading(false);
++    }
++  };
++
++  // Calculations
++  const totalRevenue = transactions
++    .filter(t => t.status === 'Berhasil')
++    .reduce((sum, t) => sum + t.amount, 0);
++
++  const pendingPaymentsCount = transactions.filter(t => t.status === 'Pending').length;
++  const totalMembers = users.filter(u => u.role === 'anggota').length;
++  const activeMembers = users.filter(u => u.role === 'anggota' && u.status === 'Aktif').length;
++
++  const membersByDojang = users
++    .filter(u => u.role === 'anggota')
++    .reduce((acc: Record<string, number>, u) => {
++      const dojangName = u.dojang || 'Lainnya';
++      acc[dojangName] = (acc[dojangName] || 0) + 1;
++      return acc;
++    }, {});
++
++  const membersByBelt = users
++    .filter(u => u.role === 'anggota')
++    .reduce((acc: Record<string, number>, u) => {
++      const beltLevel = u.belt || 'Sabuk Putih';
++      acc[beltLevel] = (acc[beltLevel] || 0) + 1;
++      return acc;
++    }, {});
++
++  const accessoryTx = transactions.filter(t => t.status === 'Berhasil' && t.type === 'Aksesoris');
++  const totalAccRevenue = accessoryTx.reduce((sum, t) => sum + t.amount, 0);
++
++  const popularAccessories = accessoryTx.reduce((acc: Record<string, { count: number; name: string }>, t) => {
++    const prodNameClean = t.details.includes(': ') ? t.details.split(': ')[1] : t.details;
++    if (!acc[prodNameClean]) {
++      acc[prodNameClean] = { count: 0, name: prodNameClean };
++    }
++    acc[prodNameClean].count += 1;
++    return acc;
++  }, {});
++
++  const eventTx = transactions.filter(t => t.status === 'Berhasil' && t.type === 'UKT');
++  const totalEvtRevenue = eventTx.reduce((sum, t) => sum + t.amount, 0);
++
++  const eventParticipants = eventTx.reduce((acc: Record<string, { count: number; name: string }>, t) => {
++    const evtNameClean = t.details.includes(': ') ? t.details.split(': ')[1] : t.details;
++    if (!acc[evtNameClean]) {
++      acc[evtNameClean] = { count: 0, name: evtNameClean };
++    }
++    acc[evtNameClean].count += 1;
++    return acc;
++  }, {});
++
++  const getSectionTitle = () => {
++    switch (activeTab) {
++      case 'ringkasan': return 'Ringkasan Dashboard';
++      case 'pesanan': return 'Verifikasi Transaksi';
++      case 'produk': return 'Kelola Produk Aksesoris';
++      case 'kategori': return 'Kelola Kategori Produk';
++      case 'laporan-anggota': return 'Laporan Data Anggota';
++      case 'laporan-aksesoris': return 'Laporan Penjualan Aksesoris';
++      case 'laporan-event': return 'Laporan Event & UKT';
++      case 'harga-setting': return 'Konfigurasi Harga & Rekening';
++      case 'profile-setting': return 'Ubah Profil Admin';
++      default: return 'Admin Portal';
++    }
++  };
++
++  // Status Badge Helper
++  const renderStatusBadge = (status: string) => {
++    switch (status) {
++      case 'Berhasil':
++        return (
++          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/50">
++            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
++            Berhasil
++          </span>
++        );
++      case 'Ditolak':
++        return (
++          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-brand-red border border-rose-200/50">
++            <span className="w-1.5 h-1.5 rounded-full bg-brand-red" />
++            Ditolak
++          </span>
++        );
++      case 'Pending':
++      default:
++        return (
++          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200/50">
++            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping" style={{ animationDuration: '2s' }} />
++            Pending
++          </span>
++        );
++    }
++  };
++
++  // Sidebar Item Helper
++  const renderSidebarItem = (tab: TabType, label: string, icon: string, badgeCount?: number, isSubItem: boolean = false) => {
++    const isActive = activeTab === tab;
++    
++    // Classes for expanded vs collapsed
++    const buttonClasses = `
++      w-full flex items-center transition-all duration-200 rounded-xl relative group
++      ${isSubItem && sidebarOpen ? 'pl-9 pr-3 py-2 text-[11px] font-bold' : 'px-3 py-2.5 text-xs font-bold uppercase tracking-wider'}
++      ${sidebarOpen ? 'justify-start gap-3' : 'justify-center py-2.5 px-0'}
++      ${isActive 
++        ? 'bg-brand-blue text-white shadow-lg shadow-brand-blue/20' 
++        : 'text-slate-400 hover:bg-slate-800/40 hover:text-slate-100'
++      }
++    `;
++
++    return (
++      <button
++        key={tab}
++        onClick={() => setActiveTab(tab)}
++        className={buttonClasses}
++      >
++        <div className="relative flex items-center justify-center shrink-0">
++          <span className="text-base">{icon}</span>
++          {/* Badge indicator in collapsed mode */}
++          {!sidebarOpen && badgeCount && badgeCount > 0 ? (
++            <span className="absolute -top-1.5 -right-1.5 w-2.5 h-2.5 bg-brand-red rounded-full ring-2 ring-[#0b0f19]" />
++          ) : null}
++        </div>
++
++        {sidebarOpen && (
++          <span className="truncate flex-1 text-left">{label}</span>
++        )}
++
++        {/* Badge count in expanded mode */}
++        {sidebarOpen && badgeCount && badgeCount > 0 ? (
++          <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold shrink-0 ${
++            isActive ? 'bg-white text-brand-blue' : 'bg-brand-red text-white'
++          }`}>
++            {badgeCount}
++          </span>
++        ) : null}
++
++        {/* Tooltip in collapsed mode */}
++        {!sidebarOpen && (
++          <div className="absolute left-full ml-3 px-2.5 py-1.5 bg-slate-950 text-slate-200 text-[10px] font-bold rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 whitespace-nowrap border border-slate-800 pointer-events-none">
++            {label}
++            {badgeCount && badgeCount > 0 ? ` (${badgeCount})` : ''}
++          </div>
++        )}
++      </button>
++    );
++  };
++
++  return (
++    <div className="h-full w-full flex bg-[#fafafc] text-slate-800 font-sans overflow-hidden">
++      {/* 1. Left Collapsible Sidebar */}
++      <aside
++        className={`${
++          sidebarOpen ? 'w-64' : 'w-16'
++        } h-full bg-[#0b0f19] text-slate-400 flex flex-col shrink-0 transition-all duration-300 z-40 relative shadow-xl`}
++      >
++        {/* Sidebar Header Brand */}
++        <div className={`h-16 flex items-center border-b border-slate-800/60 overflow-hidden shrink-0 transition-all duration-300 ${
++          sidebarOpen ? 'px-4 gap-3' : 'justify-center px-0'
++        }`}>
++          <img
++            src="/v-dojang.jpeg"
++            alt="Logo"
++            className="w-8 h-8 rounded-lg object-cover shadow-md shrink-0"
++          />
++          {sidebarOpen && (
++            <div className="flex flex-col min-w-0">
++              <span className="font-extrabold text-sm text-white tracking-tight leading-tight truncate">
++                V-DOJANG
++              </span>
++              <span className="text-[9px] uppercase font-bold tracking-widest text-brand-red truncate mt-0.5">
++                Admin Panel
++              </span>
++            </div>
++          )}
++        </div>
++
++        {/* Sidebar Navigation */}
++        <div className="flex-1 overflow-y-auto py-4 px-3 space-y-1.5 scrollbar-thin">
++          {/* Section Indicator */}
++          {sidebarOpen && (
++            <div className="px-3 py-1.5 text-[10px] font-black tracking-widest text-slate-500 uppercase">
++              Menu Utama
++            </div>
++          )}
++
++          {renderSidebarItem('ringkasan', 'Ringkasan', '📊')}
++          {renderSidebarItem('pesanan', 'Verifikasi Bayar', '💳', pendingPaymentsCount)}
++          {renderSidebarItem('produk', 'Kelola Produk', '🛍️')}
++          {renderSidebarItem('kategori', 'Kelola Kategori', '🏷️')}
++
++          {/* Section Divider */}
++          <div className="border-t border-slate-800/50 my-2"></div>
++          {sidebarOpen && (
++            <div className="px-3 py-1.5 text-[10px] font-black tracking-widest text-slate-500 uppercase flex justify-between items-center">
++              <span>Laporan Lanjutan</span>
++              <button
++                onClick={() => setShowLaporanMenu(!showLaporanMenu)}
++                className="text-slate-400 hover:text-white"
++              >
++                {showLaporanMenu ? '▼' : '▶'}
++              </button>
++            </div>
++          )}
++
++          {(showLaporanMenu || !sidebarOpen) && (
++            <div className={`${sidebarOpen ? 'pl-3 border-l border-slate-800/60' : ''} space-y-1 mt-1`}>
++              {renderSidebarItem('laporan-anggota', 'Anggota', '👥', undefined, true)}
++              {renderSidebarItem('laporan-aksesoris', 'Penjualan', '📦', undefined, true)}
++              {renderSidebarItem('laporan-event', 'Event / UKT', '🏆', undefined, true)}
++            </div>
++          )}
++
++          <div className="border-t border-slate-800/50 my-2"></div>
++          {sidebarOpen && (
++            <div className="px-3 py-1.5 text-[10px] font-black tracking-widest text-slate-500 uppercase">
++              Sistem
++            </div>
++          )}
++
++          {renderSidebarItem('harga-setting', 'Harga & Rekening', '⚙️')}
++          {renderSidebarItem('profile-setting', 'Profil Admin', '👤')}
++        </div>
++
++        {/* Sidebar Footer User Info */}
++        <div className="p-3 border-t border-slate-800/60 flex items-center justify-between shrink-0 overflow-hidden bg-slate-950/20">
++          <div className="flex items-center gap-2.5 min-w-0">
++            <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center text-slate-200 font-bold shrink-0">
++              A
++            </div>
++            {sidebarOpen && (
++              <div className="flex flex-col min-w-0">
++                <span className="font-extrabold text-xs text-slate-200 truncate">{adminUser.name}</span>
++                <span className="text-[9px] text-slate-500 truncate mt-0.5">{adminUser.email}</span>
++              </div>
++            )}
++          </div>
++        </div>
++      </aside>
++
++      {/* 2. Main Content Area */}
++      <div className="flex-grow flex flex-col min-w-0 overflow-hidden relative">
++        {/* Sticky Dashboard Header */}
++        <header className="h-16 bg-white border-b border-slate-100 px-6 flex items-center justify-between sticky top-0 z-30 shrink-0 select-none">
++          <div className="flex items-center gap-4 min-w-0">
++            {/* Sidebar toggle icon button */}
++            <button
++              onClick={() => setSidebarOpen(!sidebarOpen)}
++              className="w-10 h-10 rounded-lg hover:bg-slate-50 flex items-center justify-center border border-slate-200/60 active:scale-95 transition"
++            >
++              {sidebarOpen ? (
++                <svg className="w-5 h-5 text-slate-650" fill="none" stroke="currentColor" viewBox="0 0 24 24">
++                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
++                </svg>
++              ) : (
++                <svg className="w-5 h-5 text-slate-650" fill="none" stroke="currentColor" viewBox="0 0 24 24">
++                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
++                </svg>
++              )}
++            </button>
++            <h1 className="text-lg font-black text-slate-900 truncate">
++              {getSectionTitle()}
++            </h1>
++          </div>
++
++          <div className="flex items-center gap-3">
++            <button
++              onClick={onLogout}
++              className="px-4 py-2 border border-slate-200 hover:border-brand-red/30 hover:text-brand-red rounded-lg text-xs font-black uppercase tracking-wider transition active:scale-95 shrink-0"
++            >
++              Keluar
++            </button>
++          </div>
++        </header>
++
++        {/* Dynamic Inner Page Content */}
++        <div className="flex-1 overflow-y-auto p-6 sm:p-8">
++          <div className="max-w-7xl mx-auto w-full">
++            
++            {/* TAB: Ringkasan */}
++            {activeTab === 'ringkasan' && (
++              <div className="space-y-8 animate-fade-in">
++                {/* Stats Widgets */}
++                <div className="grid grid-cols-1 sm:grid-cols-4 gap-6">
++                  {/* Card 1: Total Anggota */}
++                  <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-xs hover:-translate-y-1 hover:shadow-md transition-all duration-300 flex items-center justify-between">
++                    <div>
++                      <p className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">Total Anggota</p>
++                      <p className="text-2xl font-black text-slate-800 mt-1">{totalMembers} <span className="text-xs font-bold text-slate-500">Orang</span></p>
++                    </div>
++                    <div className="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600 text-xl font-bold">
++                      👥
++                    </div>
++                  </div>
++
++                  {/* Card 2: Anggota Aktif */}
++                  <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-xs hover:-translate-y-1 hover:shadow-md transition-all duration-300 flex items-center justify-between">
++                    <div>
++                      <p className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">Anggota Aktif</p>
++                      <p className="text-2xl font-black text-brand-blue mt-1">{activeMembers} <span className="text-xs font-bold text-slate-500">Orang</span></p>
++                    </div>
++                    <div className="w-12 h-12 rounded-xl bg-indigo-50 flex items-center justify-center text-[#090681] text-xl font-bold">
++                      🥋
++                    </div>
++                  </div>
++
++                  {/* Card 3: Menunggu Verifikasi */}
++                  <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-xs hover:-translate-y-1 hover:shadow-md transition-all duration-300 flex items-center justify-between">
++                    <div>
++                      <p className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">Menunggu Verifikasi</p>
++                      <p className="text-2xl font-black text-brand-red mt-1">{pendingPaymentsCount} <span className="text-xs font-bold text-slate-500">Item</span></p>
++                    </div>
++                    <div className="w-12 h-12 rounded-xl bg-rose-50 flex items-center justify-center text-[#9d0f17] text-xl font-bold">
++                      💳
++                    </div>
++                  </div>
++
++                  {/* Card 4: Total Pendapatan */}
++                  <div className="bg-white rounded-2xl p-6 border border-slate-100 shadow-xs hover:-translate-y-1 hover:shadow-md transition-all duration-300 flex items-center justify-between">
++                    <div>
++                      <p className="text-[10px] font-bold uppercase text-slate-400 tracking-wider">Total Pendapatan</p>
++                      <p className="text-2xl font-black text-emerald-600 mt-1">Rp {totalRevenue.toLocaleString('id-ID')}</p>
++                    </div>
++                    <div className="w-12 h-12 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600 text-xl font-bold">
++                      💰
++                    </div>
++                  </div>
++                </div>
++
++                {/* Recent Orders Grid */}
++                <div className="space-y-4 bg-white border border-slate-200/80 p-6 rounded-2xl shadow-xs">
++                  <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Aktivitas Transaksi Terbaru</h3>
++                  <div className="border border-slate-200/85 rounded-xl overflow-hidden bg-white shadow-xs">
++                    <table className="w-full text-left text-xs border-collapse">
++                      <thead>
++                        <tr className="bg-slate-50/75 text-slate-500 font-bold border-b border-slate-200/85">
++                          <th className="p-4">Tanggal</th>
++                          <th className="p-4">Nama Anggota</th>
++                          <th className="p-4">Rincian</th>
++                          <th className="p-4">Nominal</th>
++                          <th className="p-4">Status</th>
++                        </tr>
++                      </thead>
++                      <tbody>
++                        {transactions.slice(0, 5).map(tx => (
++                          <tr key={tx.id} className="border-b border-slate-100 hover:bg-slate-50/40 transition font-semibold text-slate-650">
++                            <td className="p-4">{tx.date}</td>
++                            <td className="p-4 font-bold text-slate-800">{tx.memberName}</td>
++                            <td className="p-4">{tx.details}</td>
++                            <td className="p-4 text-brand-blue font-bold">Rp {tx.amount.toLocaleString('id-ID')}</td>
++                            <td className="p-4">
++                              {renderStatusBadge(tx.status)}
++                            </td>
++                          </tr>
++                        ))}
++                      </tbody>
++                    </table>
++                  </div>
++                </div>
++              </div>
++            )}
++
++            {/* TAB: Pesanan & Pembayaran */}
++            {activeTab === 'pesanan' && (
++              <div className="space-y-6 bg-white border border-slate-200/80 p-6 rounded-2xl shadow-xs animate-fade-in">
++                {transactions.length > 0 ? (
++                  <div className="border border-slate-200/85 rounded-xl overflow-hidden bg-white shadow-xs">
++                    <table className="w-full text-left text-xs border-collapse">
++                      <thead>
++                        <tr className="bg-slate-50/75 text-slate-500 font-bold border-b border-slate-200/85">
++                          <th className="p-4">Tanggal</th>
++                          <th className="p-4">Anggota</th>
++                          <th className="p-4">Rincian Pembayaran</th>
++                          <th className="p-4">Jumlah</th>
++                          <th className="p-4">Bukti</th>
++                          <th className="p-4">Status</th>
++                          <th className="p-4 text-right">Aksi</th>
++                        </tr>
++                      </thead>
++                      <tbody>
++                        {transactions.map(tx => (
++                          <tr key={tx.id} className="border-b border-slate-100 hover:bg-slate-50/40 transition font-semibold text-slate-650">
++                            <td className="p-4">{tx.date}</td>
++                            <td className="p-4 font-bold text-slate-800">{tx.memberName}</td>
++                            <td className="p-4">
++                              <div className="flex flex-col">
++                                <span>{tx.details}</span>
++                                <span className="text-[9px] uppercase font-bold text-slate-400 mt-0.5">{tx.type}</span>
++                              </div>
++                            </td>
++                            <td className="p-4 text-brand-blue font-bold">Rp {tx.amount.toLocaleString('id-ID')}</td>
++                            <td className="p-4 font-bold">
++                              {tx.proofImage ? (
++                                <a
++                                  href={tx.proofImage}
++                                  target="_blank"
++                                  rel="noopener noreferrer"
++                                  className="text-brand-red hover:text-brand-red-hover underline font-bold"
++                                >
++                                  Lihat Struk
++                                </a>
++                              ) : (
++                                <span className="text-slate-400 font-semibold">Kosong</span>
++                              )}
++                            </td>
++                            <td className="p-4">
++                              {renderStatusBadge(tx.status)}
++                              {tx.status === 'Ditolak' && tx.rejectReason && (
++                                <p className="text-[9px] text-brand-red font-semibold mt-1">Alasan: {tx.rejectReason}</p>
++                              )}
++                            </td>
++                            <td className="p-4 text-right">
++                              {tx.status === 'Pending' ? (
++                                <div className="flex justify-end gap-1.5">
++                                  <button
++                                    onClick={() => handleAcceptTransaction(tx.id)}
++                                    disabled={loading}
++                                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition active:scale-95 flex items-center gap-1"
++                                  >
++                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
++                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
++                                    </svg>
++                                    Terima
++                                  </button>
++                                  <button
++                                    onClick={() => handleOpenRejectModal(tx)}
++                                    disabled={loading}
++                                    className="px-3 py-1.5 bg-brand-red hover:bg-brand-red-hover text-white text-xs font-bold rounded-lg transition active:scale-95 flex items-center gap-1"
++                                  >
++                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
++                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
++                                    </svg>
++                                    Tolak
++                                  </button>
++                                </div>
++                              ) : (
++                                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Selesai</span>
++                              )}
++                            </td>
++                          </tr>
++                        ))}
++                      </tbody>
++                    </table>
++                  </div>
++                ) : (
++                  <div className="text-center py-12 border border-dashed border-slate-200 rounded-xl text-slate-400 font-semibold text-xs">
++                    Tidak ada transaksi pembayaran terdaftar.
++                  </div>
++                )}
++              </div>
++            )}
++
++            {/* TAB: Kelola Produk */}
++            {activeTab === 'produk' && (
++              <div className="space-y-6 bg-white border border-slate-100 p-6 rounded-2xl shadow-xs animate-fade-in">
++                <div className="flex justify-between items-center gap-4 flex-wrap">
++                  <h4 className="font-black text-xs text-slate-450 uppercase tracking-widest">Katalog Toko Aksesoris</h4>
++                  {!editingProduct && (
++                    <button
++                      onClick={() => {
++                        setEditingProduct({ id: '', name: '', price: 0, stock: 0, description: '', categoryId: categories[0]?.id || '' });
++                        setProdName('');
++                        setProdPrice(0);
++                        setProdStock(0);
++                        setProdDesc('');
++                      }}
++                      className="bg-brand-blue text-white text-xs font-black uppercase tracking-wider px-3.5 py-2.5 rounded-xl shadow-xs"
++                    >
++                      + Tambah Produk
++                    </button>
++                  )}
++                </div>
++
++                {editingProduct && (
++                  <form onSubmit={handleSaveProduct} className="bg-slate-50 border border-slate-100 rounded-xl p-5 space-y-4 max-w-xl">
++                    <h5 className="font-black text-xs text-brand-blue uppercase">
++                      {editingProduct.id ? 'Edit Detail Produk' : 'Buat Produk Baru'}
++                    </h5>
++
++                    <div>
++                      <label className="block text-[10px] font-bold text-slate-500 mb-1">Nama Produk</label>
++                      <input
++                        type="text"
++                        value={prodName}
++                        onChange={e => setProdName(e.target.value)}
++                        placeholder="Contoh: Dobok Kyorugi"
++                        className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white"
++                        required
++                      />
++                    </div>
++
++                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
++                      <div>
++                        <label className="block text-[10px] font-bold text-slate-500 mb-1">Harga (Rp)</label>
++                        <input
++                          type="number"
++                          value={prodPrice}
++                          onChange={e => setProdPrice(Number(e.target.value))}
++                          className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white"
++                          required
++                        />
++                      </div>
++                      <div>
++                        <label className="block text-[10px] font-bold text-slate-500 mb-1">Stok Barang</label>
++                        <input
++                          type="number"
++                          value={prodStock}
++                          onChange={e => setProdStock(Number(e.target.value))}
++                          className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white"
++                          required
++                        />
++                      </div>
++                      <div>
++                        <label className="block text-[10px] font-bold text-slate-500 mb-1">Kategori</label>
++                        <select
++                          value={prodCatId}
++                          onChange={e => setProdCatId(e.target.value)}
++                          className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-bold bg-white focus:outline-hidden"
++                        >
++                          {categories.map(c => (
++                            <option key={c.id} value={c.id}>{c.name}</option>
++                          ))}
++                        </select>
++                      </div>
++                    </div>
++
++                    <div>
++                      <label className="block text-[10px] font-bold text-slate-500 mb-1">Deskripsi Produk</label>
++                      <textarea
++                        rows={2}
++                        value={prodDesc}
++                        onChange={e => setProdDesc(e.target.value)}
++                        placeholder="Ukuran, spesifikasi bahan, dll."
++                        className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white"
++                      />
++                    </div>
++
++                    <div className="flex gap-2">
++                      <button
++                        type="submit"
++                        disabled={loading}
++                        className="px-4 py-2 bg-brand-blue text-white text-[10px] font-black uppercase rounded-lg"
++                      >
++                        Simpan
++                      </button>
++                      <button
++                        type="button"
++                        onClick={() => setEditingProduct(null)}
++                        className="px-4 py-2 border border-slate-200 text-slate-500 text-[10px] font-black uppercase rounded-lg"
++                      >
++                        Batal
++                      </button>
++                    </div>
++                  </form>
++                )}
++
++                <div className="border border-slate-100 rounded-xl overflow-hidden bg-white shadow-xs">
++                  <table className="w-full text-left text-xs border-collapse">
++                    <thead>
++                      <tr className="bg-slate-50 text-slate-500 font-extrabold border-b border-slate-100">
++                        <th className="p-4">Nama Produk</th>
++                        <th className="p-4">Kategori</th>
++                        <th className="p-4">Harga</th>
++                        <th className="p-4">Stok</th>
++                        <th className="p-4 text-right">Aksi</th>
++                      </tr>
++                    </thead>
++                    <tbody>
++                      {products.map(p => {
++                        const category = categories.find(c => c.id === p.categoryId);
++                        return (
++                          <tr key={p.id} className="border-b border-slate-100 hover:bg-slate-50/20 transition font-semibold text-slate-650">
++                            <td className="p-4 font-bold text-slate-800">{p.name}</td>
++                            <td className="p-4">
++                              <span className="bg-slate-100 text-slate-500 px-2 py-0.5 rounded text-[9px] font-bold uppercase">
++                                {category ? category.name : 'Uncategorized'}
++                              </span>
++                            </td>
++                            <td className="p-4 text-brand-blue font-bold">Rp {p.price.toLocaleString('id-ID')}</td>
++                            <td className="p-4">{p.stock} pcs</td>
++                            <td className="p-4 text-right space-x-2">
++                              <button
++                                onClick={() => handleEditProductClick(p)}
++                                className="text-[9px] font-black uppercase text-brand-blue hover:underline"
++                              >
++                                Edit
++                              </button>
++                              <button
++                                onClick={() => handleDeleteProduct(p.id)}
++                                className="text-[9px] font-black uppercase text-brand-red hover:underline"
++                              >
++                                Hapus
++                              </button>
++                            </td>
++                          </tr>
++                        );
++                      })}
++                    </tbody>
++                  </table>
++                </div>
++              </div>
++            )}
++
++            {/* TAB: Kelola Kategori */}
++            {activeTab === 'kategori' && (
++              <div className="space-y-6 bg-white border border-slate-100 p-6 rounded-2xl shadow-xs animate-fade-in">
++                <form onSubmit={handleSaveCategory} className="bg-slate-50 border border-slate-100 rounded-xl p-5 space-y-3 max-w-md animate-fade-in">
++                  <h4 className="font-black text-xs text-brand-blue uppercase">
++                    {editingCategory ? 'Edit Kategori' : 'Tambah Kategori Baru'}
++                  </h4>
++                  <div className="flex gap-2">
++                    <input
++                      type="text"
++                      value={catName}
++                      onChange={e => setCatName(e.target.value)}
++                      placeholder="Masukkan nama kategori"
++                      className="flex-1 px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white"
++                      required
++                    />
++                    <button
++                      type="submit"
++                      className="px-4 py-2 bg-brand-blue text-white text-[10px] font-black uppercase rounded-lg"
++                    >
++                      Simpan
++                    </button>
++                    {editingCategory && (
++                      <button
++                        type="button"
++                        onClick={() => { setEditingCategory(null); setCatName(''); }}
++                        className="px-3 py-2 border border-slate-200 text-slate-500 text-[10px] font-black uppercase rounded-lg"
++                      >
++                        Batal
++                      </button>
++                    )}
++                  </div>
++                </form>
++
++                <div className="border border-slate-100 rounded-xl overflow-hidden max-w-md bg-white shadow-xs">
++                  <table className="w-full text-left text-xs border-collapse">
++                    <thead>
++                      <tr className="bg-slate-50 text-slate-500 font-extrabold border-b border-slate-100">
++                        <th className="p-4">Nama Kategori</th>
++                        <th className="p-4 text-right">Aksi</th>
++                      </tr>
++                    </thead>
++                    <tbody>
++                      {categories.map(c => (
++                        <tr key={c.id} className="border-b border-slate-100 hover:bg-slate-50/20 transition font-semibold text-slate-650">
++                          <td className="p-4 font-bold text-slate-800">{c.name}</td>
++                          <td className="p-4 text-right space-x-2">
++                            <button
++                              onClick={() => { setEditingCategory(c); setCatName(c.name); }}
++                              className="text-[9px] font-black uppercase text-brand-blue hover:underline"
++                            >
++                              Edit
++                            </button>
++                            <button
++                              onClick={() => handleDeleteCategory(c.id)}
++                              className="text-[9px] font-black uppercase text-brand-red hover:underline"
++                            >
++                              Hapus
++                            </button>
++                          </td>
++                        </tr>
++                      ))}
++                    </tbody>
++                  </table>
++                </div>
++              </div>
++            )}
++
++            {/* TAB: Laporan Anggota */}
++            {activeTab === 'laporan-anggota' && (
++              <div className="space-y-6 bg-white border border-slate-100 p-6 rounded-2xl shadow-xs animate-fade-in">
++                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
++                  {/* Dojang Distribution */}
++                  <div className="bg-slate-50 border border-slate-100 rounded-xl p-5">
++                    <h4 className="font-black text-[10px] text-slate-400 uppercase tracking-widest mb-4">Anggota Per Dojang</h4>
++                    <div className="space-y-2">
++                      {Object.entries(membersByDojang).map(([dojang, count]) => (
++                        <div key={dojang} className="flex justify-between items-center text-xs font-semibold text-slate-650">
++                          <span>🏢 {dojang}</span>
++                          <span className="text-brand-blue bg-brand-blue/5 px-2 py-0.5 rounded font-bold">{count} Orang</span>
++                        </div>
++                      ))}
++                    </div>
++                  </div>
++
++                  {/* Belt Level Distribution */}
++                  <div className="bg-slate-50 border border-slate-100 rounded-xl p-5">
++                    <h4 className="font-black text-[10px] text-slate-400 uppercase tracking-widest mb-4">Distribusi Sabuk</h4>
++                    <div className="space-y-2">
++                      {Object.entries(membersByBelt).map(([belt, count]) => (
++                        <div key={belt} className="flex justify-between items-center text-xs font-semibold text-slate-650">
++                          <span>🥋 {belt}</span>
++                          <span className="text-brand-red bg-brand-red/5 px-2 py-0.5 rounded font-bold">{count} Orang</span>
++                        </div>
++                      ))}
++                    </div>
++                  </div>
++                </div>
++
++                <div className="space-y-3 pt-2">
++                  <h4 className="font-black text-slate-800 text-xs uppercase tracking-wider">Tabel Data Keanggotaan</h4>
++                  <div className="border border-slate-100 rounded-xl overflow-hidden bg-white shadow-xs">
++                    <table className="w-full text-left text-xs border-collapse">
++                      <thead>
++                        <tr className="bg-slate-50 text-slate-500 font-extrabold border-b border-slate-100">
++                          <th className="p-3">Nama Lengkap</th>
++                          <th className="p-3">Dojang</th>
++                          <th className="p-3">Kontak</th>
++                          <th className="p-3">Gender</th>
++                          <th className="p-3">Sabuk</th>
++                          <th className="p-3 text-right">Status</th>
++                        </tr>
++                      </thead>
++                      <tbody>
++                        {users
++                          .filter(u => u.role === 'anggota')
++                          .map(u => (
++                            <tr key={u.id} className="border-b border-slate-100 hover:bg-slate-50/20 transition font-semibold text-slate-650">
++                              <td className="p-3 font-bold text-slate-800">{u.name}</td>
++                              <td className="p-3">{u.dojang || '-'}</td>
++                              <td className="p-3">{u.phone || '-'}</td>
++                              <td className="p-3">{u.gender || '-'}</td>
++                              <td className="p-3 font-bold text-brand-blue">{u.belt}</td>
++                              <td className="p-3 text-right">
++                                <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase ${
++                                  u.status === 'Aktif' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'bg-rose-50 text-brand-red border border-rose-100'
++                                }`}>
++                                  {u.status}
++                                </span>
++                              </td>
++                            </tr>
++                          ))}
++                      </tbody>
++                    </table>
++                  </div>
++                </div>
++              </div>
++            )}
++
++            {/* TAB: Laporan Aksesoris */}
++            {activeTab === 'laporan-aksesoris' && (
++              <div className="space-y-6 bg-white border border-slate-100 p-6 rounded-2xl shadow-xs animate-fade-in">
++                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
++                  <div className="bg-slate-50 border border-slate-100 rounded-xl p-5">
++                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Transaksi</p>
++                    <p className="text-2xl font-black text-slate-800 mt-1">{accessoryTx.length} Pesanan</p>
++                  </div>
++                  <div className="bg-slate-50 border border-slate-100 rounded-xl p-5">
++                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Penjualan</p>
++                    <p className="text-2xl font-black text-emerald-600 mt-1">Rp {totalAccRevenue.toLocaleString('id-ID')}</p>
++                  </div>
++                </div>
++
++                <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
++                  <div className="bg-slate-50 border border-slate-100 rounded-xl p-5 md:col-span-4">
++                    <h4 className="font-black text-[10px] text-slate-400 uppercase tracking-widest mb-4">Aksesoris Terlaris</h4>
++                    <div className="space-y-2">
++                      {Object.values(popularAccessories).map(item => (
++                        <div key={item.name} className="flex justify-between items-center text-xs font-semibold text-slate-650">
++                          <span className="truncate mr-2">🛍️ {item.name}</span>
++                          <span className="bg-brand-blue/5 text-brand-blue px-2 py-0.5 rounded font-bold shrink-0">{item.count} Terjual</span>
++                        </div>
++                      ))}
++                    </div>
++                  </div>
++
++                  <div className="md:col-span-8 space-y-3">
++                    <h4 className="font-black text-slate-800 text-xs uppercase tracking-wider">Log Transaksi Toko</h4>
++                    <div className="border border-slate-100 rounded-xl overflow-hidden bg-white shadow-xs">
++                      <table className="w-full text-left text-xs border-collapse">
++                        <thead>
++                          <tr className="bg-slate-50 text-slate-500 font-extrabold border-b border-slate-100">
++                            <th className="p-3">Tanggal</th>
++                            <th className="p-3">Anggota</th>
++                            <th className="p-3">Deskripsi Barang</th>
++                            <th className="p-3 text-right">Subtotal</th>
++                          </tr>
++                        </thead>
++                        <tbody>
++                          {accessoryTx.map(tx => (
++                            <tr key={tx.id} className="border-b border-slate-100 hover:bg-slate-50/20 transition font-semibold text-slate-650">
++                              <td className="p-3">{tx.date}</td>
++                              <td className="p-3 font-bold text-slate-800">{tx.memberName}</td>
++                              <td className="p-3">{tx.details}</td>
++                              <td className="p-3 text-brand-blue font-bold text-right">Rp {tx.amount.toLocaleString('id-ID')}</td>
++                            </tr>
++                          ))}
++                        </tbody>
++                      </table>
++                    </div>
++                  </div>
++                </div>
++              </div>
++            )}
++
++            {/* TAB: Laporan Event */}
++            {activeTab === 'laporan-event' && (
++              <div className="space-y-6 bg-white border border-slate-100 p-6 rounded-2xl shadow-xs animate-fade-in">
++                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
++                  <div className="bg-slate-50 border border-slate-100 rounded-xl p-5">
++                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Peserta UKT/Event</p>
++                    <p className="text-2xl font-black text-slate-800 mt-1">{eventTx.length} Orang</p>
++                  </div>
++                  <div className="bg-slate-50 border border-slate-100 rounded-xl p-5">
++                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Biaya Pendaftaran</p>
++                    <p className="text-2xl font-black text-emerald-600 mt-1">Rp {totalEvtRevenue.toLocaleString('id-ID')}</p>
++                  </div>
++                </div>
++
++                <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
++                  <div className="bg-slate-50 border border-slate-100 rounded-xl p-5 md:col-span-5">
++                    <h4 className="font-black text-[10px] text-slate-400 uppercase tracking-widest mb-4">Jumlah Pendaftar Kegiatan</h4>
++                    <div className="space-y-2">
++                      {Object.values(eventParticipants).map(evt => (
++                        <div key={evt.name} className="flex justify-between items-center text-xs font-semibold text-slate-650">
++                          <span className="truncate mr-2">🏆 {evt.name}</span>
++                          <span className="bg-brand-red/5 text-brand-red px-2 py-0.5 rounded font-bold shrink-0">{evt.count} Orang</span>
++                        </div>
++                      ))}
++                    </div>
++                  </div>
++
++                  <div className="md:col-span-7 space-y-3">
++                    <h4 className="font-black text-slate-800 text-xs uppercase tracking-wider">Tabel Peserta Kegiatan</h4>
++                    <div className="border border-slate-100 rounded-xl overflow-hidden bg-white shadow-xs">
++                      <table className="w-full text-left text-xs border-collapse">
++                        <thead>
++                          <tr className="bg-slate-50 text-slate-500 font-extrabold border-b border-slate-100">
++                            <th className="p-3">Tanggal</th>
++                            <th className="p-3">Nama Anggota</th>
++                            <th className="p-3 text-right">Nominal</th>
++                          </tr>
++                        </thead>
++                        <tbody>
++                          {eventTx.map(tx => (
++                            <tr key={tx.id} className="border-b border-slate-100 hover:bg-slate-50/20 transition font-semibold text-slate-650">
++                              <td className="p-3">{tx.date}</td>
++                              <td className="p-3 font-bold text-slate-800">{tx.memberName}</td>
++                              <td className="p-3 text-brand-blue font-bold text-right">Rp {tx.amount.toLocaleString('id-ID')}</td>
++                            </tr>
++                          ))}
++                        </tbody>
++                      </table>
++                    </div>
++                  </div>
++                </div>
++              </div>
++            )}
++
++            {/* TAB: Harga & Bank */}
++            {activeTab === 'harga-setting' && (
++              <div className="space-y-8 bg-white border border-slate-100 p-6 rounded-2xl shadow-xs animate-fade-in">
++                <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
++                  <form onSubmit={handleSaveSettings} className="bg-slate-50 border border-slate-100 rounded-xl p-5 space-y-4 md:col-span-5 w-full">
++                    <h4 className="font-black text-xs text-brand-blue uppercase border-b border-slate-200 pb-2">Informasi Pembayaran</h4>
++                    
++                    <div>
++                      <label className="block text-[10px] font-bold text-slate-500 mb-1">Pendaftaran Baru (Rp)</label>
++                      <input
++                        type="number"
++                        value={regFee}
++                        onChange={e => setRegFee(Number(e.target.value))}
++                        className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white"
++                        required
++                      />
++                    </div>
++
++                    <div>
++                      <label className="block text-[10px] font-bold text-slate-500 mb-1">Nama Bank Penerima</label>
++                      <input
++                        type="text"
++                        value={bankName}
++                        onChange={e => setBankName(e.target.value)}
++                        className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white"
++                        required
++                      />
++                    </div>
++
++                    <div>
++                      <label className="block text-[10px] font-bold text-slate-500 mb-1">Nomor Rekening</label>
++                      <input
++                        type="text"
++                        value={bankAcc}
++                        onChange={e => setBankAcc(e.target.value)}
++                        className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white"
++                        required
++                      />
++                    </div>
++
++                    <div>
++                      <label className="block text-[10px] font-bold text-slate-500 mb-1">Nama Penerima Rekening</label>
++                      <input
++                        type="text"
++                        value={bankRecipient}
++                        onChange={e => setBankRecipient(e.target.value)}
++                        className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white"
++                        required
++                      />
++                    </div>
++
++                    <button
++                      type="submit"
++                      disabled={loading}
++                      className="w-full py-2.5 bg-brand-blue hover:bg-brand-blue-hover text-white text-[10px] font-black uppercase rounded-lg"
++                  >
++                    Simpan Pengaturan
++                  </button>
++                </form>
++
++                {/* Manage Events/UKT section */}
++                <div className="md:col-span-7 space-y-4 w-full">
++                  <div className="flex justify-between items-center">
++                    <h4 className="font-black text-[10px] text-slate-400 uppercase tracking-widest">Agenda Turnamen &amp; UKT</h4>
++                    {!editingEvent && (
++                      <button
++                        onClick={() => {
++                          setEditingEvent({ id: '', name: '', date: '', location: '', price: 0, category: 'Semua Tingkatan' });
++                          setEvtName('');
++                          setEvtDate('');
++                          setEvtLoc('');
++                          setEvtPrice(0);
++                          setEvtCat('Semua Tingkatan');
++                        }}
++                        className="px-2.5 py-1 bg-brand-blue text-white text-[9px] font-black uppercase rounded-lg"
++                      >
++                        + Event
++                      </button>
++                    )}
++                  </div>
++
++                  {editingEvent && (
++                    <form onSubmit={handleSaveEvent} className="bg-slate-50 border border-slate-100 rounded-xl p-4 space-y-3">
++                      <h5 className="font-bold text-[10px] text-brand-blue uppercase">{editingEvent.id ? 'Edit Event' : 'Tambah Event Baru'}</h5>
++                      <div>
++                        <label className="block text-[9px] font-bold text-slate-500 mb-0.5">Nama Kegiatan</label>
++                        <input
++                          type="text"
++                          value={evtName}
++                          onChange={e => setEvtName(e.target.value)}
++                          className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white"
++                          required
++                        />
++                      </div>
++                      <div className="grid grid-cols-2 gap-3">
++                        <div>
++                          <label className="block text-[9px] font-bold text-slate-500 mb-0.5">Tanggal</label>
++                          <input
++                            type="date"
++                            value={evtDate}
++                            onChange={e => setEvtDate(e.target.value)}
++                            className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white"
++                            required
++                          />
++                        </div>
++                        <div>
++                          <label className="block text-[9px] font-bold text-slate-500 mb-0.5">Kategori Sabuk/Umur</label>
++                          <input
++                            type="text"
++                            value={evtCat}
++                            onChange={e => setEvtCat(e.target.value)}
++                            className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white"
++                            required
++                          />
++                        </div>
++                      </div>
++                      <div className="grid grid-cols-2 gap-3">
++                        <div>
++                          <label className="block text-[9px] font-bold text-slate-500 mb-0.5">Lokasi</label>
++                          <input
++                            type="text"
++                            value={evtLoc}
++                            onChange={e => setEvtLoc(e.target.value)}
++                            className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white"
++                            required
++                          />
++                        </div>
++                        <div>
++                          <label className="block text-[9px] font-bold text-slate-500 mb-0.5">Biaya (Rp)</label>
++                          <input
++                            type="number"
++                            value={evtPrice}
++                            onChange={e => setEvtPrice(Number(e.target.value))}
++                            className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white"
++                            required
++                          />
++                        </div>
++                      </div>
++                      <div className="flex gap-2">
++                        <button type="submit" className="px-3 py-1.5 bg-brand-blue text-white text-[9px] font-bold rounded-lg uppercase">Simpan</button>
++                        <button type="button" onClick={() => setEditingEvent(null)} className="px-3 py-1.5 border border-slate-200 text-[9px] font-bold rounded-lg uppercase">Batal</button>
++                      </div>
++                    </form>
++                  )}
++
++                  <div className="border border-slate-100 rounded-xl overflow-hidden bg-white">
++                    <table className="w-full text-left text-xs border-collapse">
++                      <thead>
++                        <tr className="bg-slate-50 text-slate-500 font-extrabold border-b border-slate-100">
++                          <th className="p-3">Nama Event</th>
++                          <th className="p-3">Biaya</th>
++                          <th className="p-3 text-right">Aksi</th>
++                        </tr>
++                      </thead>
++                      <tbody>
++                        {events.map(ev => (
++                          <tr key={ev.id} className="border-b border-slate-100 hover:bg-slate-50/20 transition font-semibold text-slate-650">
++                            <td className="p-3">
++                              <div className="flex flex-col">
++                                <span className="font-bold text-slate-800">{ev.name}</span>
++                                <span className="text-[9px] text-slate-400 mt-0.5">📅 {ev.date} | 📍 {ev.location}</span>
++                              </div>
++                            </td>
++                            <td className="p-3 text-brand-blue font-bold">Rp {ev.price.toLocaleString('id-ID')}</td>
++                            <td className="p-3 text-right space-x-2">
++                              <button
++                                onClick={() => {
++                                  setEditingEvent(ev);
++                                  setEvtName(ev.name);
++                                  setEvtDate(ev.date);
++                                  setEvtLoc(ev.location);
++                                  setEvtPrice(ev.price);
++                                  setEvtCat(ev.category);
++                                }}
++                                className="text-[9px] font-black text-brand-blue uppercase hover:underline"
++                              >
++                                Edit
++                              </button>
++                              <button
++                                onClick={() => handleDeleteEvent(ev.id)}
++                                className="text-[9px] font-black text-brand-red uppercase hover:underline"
++                              >
++                                Hapus
++                              </button>
++                            </td>
++                          </tr>
++                        ))}
++                      </tbody>
++                    </table>
++                  </div>
++                </div>
++              </div>
++            </div>
++          )}
++
++          {/* TAB: Profil Admin Setting */}
++          {activeTab === 'profile-setting' && (
++            <div className="space-y-6 bg-white border border-slate-100 p-6 rounded-2xl shadow-xs animate-fade-in max-w-md">
++              <form onSubmit={handleSaveProfile} className="space-y-4 w-full">
++                <div>
++                  <label className="block text-[10px] font-bold text-slate-500 mb-1">Nama Lengkap Admin</label>
++                  <input
++                    type="text"
++                    value={adminName}
++                    onChange={e => setAdminName(e.target.value)}
++                    className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden bg-[#fafafc]"
++                    required
++                  />
++                </div>
++
++                <div>
++                  <label className="block text-[10px] font-bold text-slate-500 mb-1">Alamat Email</label>
++                  <input
++                    type="email"
++                    value={adminEmail}
++                    onChange={e => setAdminEmail(e.target.value)}
++                    className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden bg-[#fafafc]"
++                    required
++                  />
++                </div>
++
++                <div>
++                  <label className="block text-[10px] font-bold text-slate-500 mb-1">Sandi Baru</label>
++                  <input
++                    type="password"
++                    value={adminPassword}
++                    onChange={e => setAdminPassword(e.target.value)}
++                    placeholder="Masukkan sandi baru"
++                    className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden bg-[#fafafc]"
++                    required
++                  />
++                </div>
++
++                <button
++                  type="submit"
++                  disabled={loading}
++                  className="px-5 py-2.5 bg-brand-blue text-white text-[10px] font-black uppercase rounded-lg shadow-xs"
++                >
++                  Simpan Perubahan
++                </button>
++              </form>
++            </div>
++          )}
++        </div>
++      </div>
++
++      {/* REJECTION MODAL */}
++      {rejectingTx && (
++        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4 animate-fade-in">
++          <div className="bg-white rounded-2xl border border-slate-100 w-full max-w-sm overflow-hidden shadow-lg">
++            <div className="border-b border-slate-100 p-5 flex justify-between items-center">
++              <div>
++                <h3 className="font-black text-sm text-slate-800">Tolak Pembayaran</h3>
++                <p className="text-[9px] text-rose-500 uppercase tracking-widest mt-0.5">Penolakan Transaksi</p>
++              </div>
++              <button onClick={() => setRejectingTx(null)} className="text-slate-400 hover:text-slate-600 font-bold">
++                ✕
++              </button>
++            </div>
++
++            <form onSubmit={handleRejectTransaction} className="p-6 space-y-4">
++              <div>
++                <p className="text-[9px] font-bold text-slate-400">Pesan Anggota:</p>
++                <h4 className="font-extrabold text-slate-800 mt-0.5 text-xs">{rejectingTx.details}</h4>
++                <p className="text-[9px] text-brand-blue font-bold mt-0.5">Oleh: {rejectingTx.memberName}</p>
++              </div>
++
++              <div>
++                <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-2">
++                  Alasan Penolakan
++                </label>
++                <textarea
++                  rows={3}
++                  value={rejectReason}
++                  onChange={e => setRejectReason(e.target.value)}
++                  placeholder="Beri alasan penolakan..."
++                  className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden focus:border-brand-red"
++                  required
++                />
++              </div>
++
++              <div className="flex gap-2">
++                <button
++                  type="submit"
++                  disabled={loading}
++                  className="w-2/3 py-2.5 bg-brand-red hover:bg-brand-red-hover text-white text-[10px] font-black uppercase rounded-lg shadow-sm"
++                >
++                  {loading ? 'Memproses...' : 'Tolak Transaksi'}
++                </button>
++                <button
++                  type="button"
++                  onClick={() => setRejectingTx(null)}
++                  className="w-1/3 py-2.5 border border-slate-200 text-slate-500 text-[10px] font-black uppercase rounded-lg"
++                >
++                  Batal
++                </button>
++              </div>
++            </form>
++          </div>
++        </div>
++      )}
++    </div>
++  );
++}
