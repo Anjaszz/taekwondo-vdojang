@@ -346,15 +346,6 @@ export default function LandingPage({
                 Lengkapi kebutuhan latihan dengan seragam dobok resmi Kukkiwon, body protector, dan perlengkapan latihan lainnya.
               </p>
             </div>
-            {currentUser && (
-              <button
-                onClick={() => setView('dashboard')}
-                className="flex items-center gap-2 px-5 py-2.5 border border-slate-200 rounded-xl text-sm font-bold text-slate-600 hover:border-brand-blue/30 hover:text-brand-blue transition shrink-0"
-              >
-                <ShoppingBag size={15} />
-                Lihat Semua
-              </button>
-            )}
           </div>
 
           <div className="space-y-12">

@@ -8,7 +8,7 @@ import {
   Menu, Eye, EyeOff, Save, Plus, Edit2, Trash2, X,
   TrendingUp, ShoppingBag, AlertCircle, CheckCircle2, Clock,
   Upload, ImageIcon, Calendar, MapPin, Mail, Phone, Award, Copy,
-  ExternalLink,
+  ExternalLink, Loader2,
 } from 'lucide-react';
 
 interface DashboardAdminProps {
@@ -1135,9 +1135,16 @@ export default function DashboardAdmin({
                       <button
                         type="submit"
                         disabled={loading}
-                        className="px-4 py-2 bg-brand-blue text-white text-[10px] font-black uppercase rounded-lg"
+                        className="px-4 py-2 bg-brand-blue text-white text-[10px] font-black uppercase rounded-lg inline-flex items-center gap-1.5"
                       >
-                        Simpan
+                        {loading ? (
+                          <>
+                            <Loader2 size={12} className="animate-spin" />
+                            <span>Menyimpan...</span>
+                          </>
+                        ) : (
+                          <span>Simpan</span>
+                        )}
                       </button>
                       <button
                         type="button"
@@ -1233,9 +1240,17 @@ export default function DashboardAdmin({
                     />
                     <button
                       type="submit"
-                      className="px-4 py-2 bg-brand-blue text-white text-[10px] font-black uppercase rounded-lg"
+                      disabled={loading}
+                      className="px-4 py-2 bg-brand-blue text-white text-[10px] font-black uppercase rounded-lg inline-flex items-center gap-1.5"
                     >
-                      Simpan
+                      {loading ? (
+                        <>
+                          <Loader2 size={12} className="animate-spin" />
+                          <span>Menyimpan...</span>
+                        </>
+                      ) : (
+                        <span>Simpan</span>
+                      )}
                     </button>
                     {editingCategory && (
                       <button
@@ -1626,10 +1641,17 @@ export default function DashboardAdmin({
                     <button
                       type="submit"
                       disabled={loading}
-                      className="w-full py-2.5 bg-brand-blue hover:bg-brand-blue-hover text-white text-[10px] font-black uppercase rounded-lg"
-                  >
-                    Simpan Pengaturan
-                  </button>
+                      className="w-full py-2.5 bg-brand-blue hover:bg-brand-blue-hover text-white text-[10px] font-black uppercase rounded-lg flex items-center justify-center gap-1.5"
+                    >
+                      {loading ? (
+                        <>
+                          <Loader2 size={12} className="animate-spin" />
+                          <span>Menyimpan...</span>
+                        </>
+                      ) : (
+                        <span>Simpan Pengaturan</span>
+                      )}
+                    </button>
                 </form>
 
                 {/* Manage Events/UKT section */}
@@ -1711,7 +1733,20 @@ export default function DashboardAdmin({
                       </div>
 
                       <div className="flex gap-2">
-                        <button type="submit" className="px-3 py-1.5 bg-brand-blue text-white text-[9px] font-bold rounded-lg uppercase">Simpan</button>
+                        <button
+                          type="submit"
+                          disabled={loading}
+                          className="px-3 py-1.5 bg-brand-blue text-white text-[9px] font-bold rounded-lg uppercase inline-flex items-center gap-1"
+                        >
+                          {loading ? (
+                            <>
+                              <Loader2 size={10} className="animate-spin" />
+                              <span>Menyimpan...</span>
+                            </>
+                          ) : (
+                            <span>Simpan</span>
+                          )}
+                        </button>
                         <button type="button" onClick={() => setEditingEvent(null)} className="px-3 py-1.5 border border-slate-200 text-[9px] font-bold rounded-lg uppercase">Batal</button>
                       </div>
                     </form>
@@ -1827,9 +1862,16 @@ export default function DashboardAdmin({
                 <button
                   type="submit"
                   disabled={loading}
-                  className="px-5 py-2.5 bg-brand-blue text-white text-[10px] font-black uppercase rounded-lg shadow-xs"
+                  className="px-5 py-2.5 bg-brand-blue text-white text-[10px] font-black uppercase rounded-lg shadow-xs inline-flex items-center gap-1.5"
                 >
-                  Simpan Perubahan
+                  {loading ? (
+                    <>
+                      <Loader2 size={12} className="animate-spin" />
+                      <span>Menyimpan...</span>
+                    </>
+                  ) : (
+                    <span>Simpan Perubahan</span>
+                  )}
                 </button>
               </form>
             </div>
@@ -1877,9 +1919,16 @@ export default function DashboardAdmin({
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-2/3 py-2.5 bg-brand-red hover:bg-brand-red-hover text-white text-[10px] font-black uppercase rounded-lg shadow-sm"
+                  className="w-2/3 py-2.5 bg-brand-red hover:bg-brand-red-hover text-white text-[10px] font-black uppercase rounded-lg shadow-sm flex items-center justify-center gap-1.5"
                 >
-                  {loading ? 'Memproses...' : 'Tolak Transaksi'}
+                  {loading ? (
+                    <>
+                      <Loader2 size={12} className="animate-spin" />
+                      <span>Memproses...</span>
+                    </>
+                  ) : (
+                    <span>Tolak Transaksi</span>
+                  )}
                 </button>
                 <button
                   type="button"

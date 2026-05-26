@@ -4,7 +4,7 @@ import { useToast } from './ui/ToastProvider';
 import { useConfirm } from './ui/ConfirmModal';
 import {
   LayoutDashboard, CreditCard, Users, TrendingUp, Clock, CheckCircle2, Menu,
-  User as UserIcon, ChevronLeft, ChevronRight,
+  User as UserIcon, ChevronLeft, ChevronRight, Loader2,
 } from 'lucide-react';
 
 interface DashboardKasirProps {
@@ -561,9 +561,16 @@ export default function DashboardKasir({ kasirUser, onLogout, activeTabProp, set
                 <button
                   type="submit"
                   disabled={loading}
-                  className="w-2/3 py-2.5 bg-brand-red hover:bg-brand-red-hover text-white text-[10px] font-black uppercase rounded-lg shadow-sm"
+                  className="w-2/3 py-2.5 bg-brand-red hover:bg-brand-red-hover text-white text-[10px] font-black uppercase rounded-lg shadow-sm flex items-center justify-center gap-1.5"
                 >
-                  {loading ? 'Memproses...' : 'Tolak Pembayaran'}
+                  {loading ? (
+                    <>
+                      <Loader2 size={12} className="animate-spin" />
+                      <span>Memproses...</span>
+                    </>
+                  ) : (
+                    <span>Tolak Pembayaran</span>
+                  )}
                 </button>
                 <button
                   type="button"
