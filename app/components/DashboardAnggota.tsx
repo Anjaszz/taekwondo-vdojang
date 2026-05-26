@@ -410,10 +410,16 @@ export default function DashboardAnggota({
                     >
                       <option value="Sabuk Putih">⬜ Sabuk Putih</option>
                       <option value="Sabuk Kuning">🟨 Sabuk Kuning</option>
+                      <option value="Sabuk Kuning Strip Hijau">🟨🟩 Sabuk Kuning Strip Hijau</option>
                       <option value="Sabuk Hijau">🟩 Sabuk Hijau</option>
+                      <option value="Sabuk Hijau Strip Biru">🟩🟦 Sabuk Hijau Strip Biru</option>
                       <option value="Sabuk Biru">🟦 Sabuk Biru</option>
+                      <option value="Sabuk Biru Strip Merah">🟦🟥 Sabuk Biru Strip Merah</option>
                       <option value="Sabuk Merah">🟥 Sabuk Merah</option>
-                      <option value="Sabuk Hitam">⬛ Sabuk Hitam</option>
+                      <option value="Sabuk Merah Strip Hitam (Geup 1)">🟥⬛ Sabuk Merah Strip Hitam (Geup 1)</option>
+                      <option value="Sabuk Merah (Poom 1)">🟥🔴 Sabuk Merah (Poom 1)</option>
+                      <option value="Sabuk Merah (Poom 2)">🟥🔴 Sabuk Merah (Poom 2)</option>
+                      <option value="Sabuk Merah (Poom 3)">🟥🔴 Sabuk Merah (Poom 3)</option>
                     </select>
                   </div>
                 </div>

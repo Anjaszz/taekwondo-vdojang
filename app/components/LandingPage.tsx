@@ -426,7 +426,7 @@ export default function LandingPage({
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-14">
             <SectionLabel>Tempat Latihan</SectionLabel>
-            <h2 className="text-3xl sm:text-4xl font-black text-slate-900 mt-3">Dojang & Lokasi Latihan</h2>
+            <h2 className="text-3xl sm:text-4xl font-black text-slate-900 mt-3">Dojang & Lokasi Latihan Training Center</h2>
             <p className="text-slate-500 mt-3 max-w-xl mx-auto text-sm font-medium">
               Pilih cabang dojang latihan terdekat untuk mengikuti jadwal rutin pendaftaran.
             </p>
@@ -604,9 +604,7 @@ export default function LandingPage({
                 <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Taekwondo Club</p>
               </div>
             </div>
-            <p className="text-xs leading-relaxed font-medium text-slate-500">
-              Sistem Informasi Manajemen Club Taekwondo — pendaftaran terintegrasi, UKT, turnamen, dan kelengkapan bela diri.
-            </p>
+            
           </div>
 
           {/* Links */}
@@ -629,10 +627,10 @@ export default function LandingPage({
               <li className="flex items-center gap-2">
                 <Mail size={12} className="text-slate-500 shrink-0" />
                 <a 
-                  href="mailto:info@vdojang.com" 
+                  href="mailto:naufalmuzakkiramadhan@gmail.com" 
                   className="hover:text-white transition-colors duration-200"
                 >
-                  info@vdojang.com
+                  naufalmuzakkiramadhan@gmail.com 
                 </a>
               </li>
               <li className="flex items-center gap-2">

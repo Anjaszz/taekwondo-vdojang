@@ -47,7 +47,7 @@ export default function DaftarForm({
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
-  const [jenjang, setJenjang] = useState<'SD' | 'SMP' | 'SMA/SMK' | 'Umum'>('SD');
+  const [jenjang, setJenjang] = useState<'TK' | 'SD' | 'SMP' | 'SMA/SMK' | 'Kuliah'>('SD');
   const [dojang, setDojang] = useState('');
   const [belt, setBelt] = useState('Sabuk Putih');
   const [gender, setGender] = useState<'Laki-laki' | 'Perempuan'>('Laki-laki');
@@ -381,10 +381,10 @@ export default function DaftarForm({
               {/* Jenjang */}
               <div className="space-y-1.5 md:col-span-2">
                 <label className="block text-[11px] font-black uppercase text-slate-400 tracking-wider mb-2">
-                  Jenjang Pendidikan / Umum
+                  Jenjang Pendidikan
                 </label>
-                <div className="grid grid-cols-4 gap-2">
-                  {(['SD', 'SMP', 'SMA/SMK', 'Umum'] as const).map(j => (
+                <div className="grid grid-cols-5 gap-2">
+                  {(['TK', 'SD', 'SMP', 'SMA/SMK', 'Kuliah'] as const).map(j => (
                     <button
                       key={j}
                       type="button"
@@ -414,7 +414,7 @@ export default function DaftarForm({
                     type="text"
                     value={dojang}
                     onChange={e => setDojang(e.target.value)}
-                    placeholder="Contoh: Dojang Senayan"
+                    placeholder="Contoh: Dojang Waterfall Cikunir"
                     className="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold text-slate-800 placeholder:text-slate-300 focus:outline-none focus:border-brand-blue focus:ring-1 focus:ring-brand-blue/30 transition bg-white"
                     required
                   />
@@ -437,10 +437,16 @@ export default function DaftarForm({
                   >
                     <option value="Sabuk Putih">⬜ Sabuk Putih</option>
                     <option value="Sabuk Kuning">🟨 Sabuk Kuning</option>
+                    <option value="Sabuk Kuning Strip Hijau">🟨🟩 Sabuk Kuning Strip Hijau</option>
                     <option value="Sabuk Hijau">🟩 Sabuk Hijau</option>
+                    <option value="Sabuk Hijau Strip Biru">🟩🟦 Sabuk Hijau Strip Biru</option>
                     <option value="Sabuk Biru">🟦 Sabuk Biru</option>
+                    <option value="Sabuk Biru Strip Merah">🟦🟥 Sabuk Biru Strip Merah</option>
                     <option value="Sabuk Merah">🟥 Sabuk Merah</option>
-                    <option value="Sabuk Hitam">⬛ Sabuk Hitam</option>
+                    <option value="Sabuk Merah Strip Hitam (Geup 1)">🟥⬛ Sabuk Merah Strip Hitam (Geup 1)</option>
+                    <option value="Sabuk Merah (Poom 1)">🟥🔴 Sabuk Merah (Poom 1)</option>
+                    <option value="Sabuk Merah (Poom 2)">🟥🔴 Sabuk Merah (Poom 2)</option>
+                    <option value="Sabuk Merah (Poom 3)">🟥🔴 Sabuk Merah (Poom 3)</option>
                   </select>
                   <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 text-[10px]">
                     ▼
