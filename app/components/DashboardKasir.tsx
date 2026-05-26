@@ -49,7 +49,10 @@ export default function DashboardKasir({ kasirUser, onLogout, activeTabProp, set
 
   useEffect(() => {
     loadKasirData();
-  }, []);
+    if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+      setSidebarOpen(false);
+    }
+  }, [activeTabProp]);
 
   // Accept Transaction Handler
   const handleAcceptTransaction = async (txId: string) => {
@@ -243,21 +246,34 @@ export default function DashboardKasir({ kasirUser, onLogout, activeTabProp, set
   return (
     <div className="h-full w-full flex bg-slate-50 text-slate-800 font-sans overflow-hidden">
       {confirmModalEl}
+
+      {/* Mobile Sidebar Backdrop Overlay */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-slate-950/40 backdrop-blur-xs z-30 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
       {/* 1. Left Collapsible Sidebar */}
       <aside
-        className={`${
-          sidebarOpen ? 'w-64' : 'w-16'
-        } h-full bg-[#0b0f19] text-slate-400 flex flex-col shrink-0 transition-all duration-300 z-40 relative shadow-xl`}
+        className={`
+          fixed inset-y-0 left-0 lg:relative z-40 h-full bg-[#0b0f19] text-slate-400 flex flex-col shrink-0 transition-all duration-300 shadow-2xl
+          ${sidebarOpen ? 'w-64 translate-x-0' : 'w-[70px] -translate-x-full lg:translate-x-0 lg:w-[70px]'}
+        `}
       >
         {/* Sidebar Header Brand */}
         <div className={`h-16 flex items-center border-b border-slate-800/60 overflow-hidden shrink-0 transition-all duration-300 ${
           sidebarOpen ? 'px-4 gap-3' : 'justify-center px-0'
         }`}>
-          <img
-            src="/v-dojang.jpeg"
-            alt="Logo"
-            className="w-8 h-8 rounded-lg object-cover shadow-md shrink-0"
-          />
+          <div className="relative shrink-0">
+            <img
+              src="/v-dojang.jpeg"
+              alt="Logo"
+              className="w-9 h-9 rounded-xl object-cover shadow-lg"
+            />
+            <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-brand-red rounded-full border-2 border-[#0b0f19]" />
+          </div>
           {sidebarOpen && (
             <div className="flex flex-col min-w-0">
               <span className="font-extrabold text-sm text-white tracking-tight leading-tight truncate">
@@ -321,7 +337,13 @@ export default function DashboardKasir({ kasirUser, onLogout, activeTabProp, set
             </h1>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl">
+              <div className="w-6 h-6 rounded-lg bg-brand-blue/10 flex items-center justify-center">
+                <UserIcon size={12} className="text-brand-blue" />
+              </div>
+              <span className="text-xs font-bold text-slate-700">{kasirUser.name}</span>
+            </div>
             <button
               onClick={onLogout}
               className="px-4 py-2 border border-slate-200 hover:border-brand-red/30 hover:text-brand-red rounded-lg text-xs font-black uppercase tracking-wider transition active:scale-95 shrink-0"
@@ -332,7 +354,7 @@ export default function DashboardKasir({ kasirUser, onLogout, activeTabProp, set
         </header>
 
         {/* Dynamic Inner Page Content */}
-        <div className="flex-1 overflow-y-auto p-6 sm:p-8">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6">
           <div className="max-w-7xl mx-auto w-full">
             
             {/* TAB: Ringkasan */}
@@ -375,10 +397,10 @@ export default function DashboardKasir({ kasirUser, onLogout, activeTabProp, set
                 </div>
 
                 {/* Quick Transaction List */}
-                <div className="space-y-4 bg-white border border-slate-200/80 p-6 rounded-2xl shadow-xs">
+                <div className="space-y-4 bg-white border border-slate-200/80 p-4 sm:p-6 rounded-2xl shadow-xs">
                   <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Aktivitas Transaksi Terbaru</h3>
-                  <div className="border border-slate-200/85 rounded-xl overflow-hidden bg-white shadow-xs">
-                    <table className="w-full text-left text-xs border-collapse">
+                  <div className="border border-slate-200/85 rounded-xl overflow-x-auto bg-white shadow-xs">
+                    <table className="w-full text-left text-xs border-collapse min-w-[600px]">
                       <thead>
                         <tr className="bg-slate-50/75 text-slate-500 font-bold border-b border-slate-200/85">
                           <th className="p-4">Tanggal</th>
@@ -409,10 +431,10 @@ export default function DashboardKasir({ kasirUser, onLogout, activeTabProp, set
 
             {/* TAB: Verifikasi Transaksi */}
             {activeTab === 'pesanan' && (
-              <div className="space-y-6 bg-white border border-slate-200/80 p-6 rounded-2xl shadow-xs animate-fade-in">
+              <div className="space-y-6 bg-white border border-slate-200/80 p-4 sm:p-6 rounded-2xl shadow-xs animate-fade-in">
                 {transactions.length > 0 ? (
-                  <div className="border border-slate-200/85 rounded-xl overflow-hidden bg-white shadow-xs">
-                    <table className="w-full text-left text-xs border-collapse">
+                  <div className="border border-slate-200/85 rounded-xl overflow-x-auto bg-white shadow-xs">
+                    <table className="w-full text-left text-xs border-collapse min-w-[800px]">
                       <thead>
                         <tr className="bg-slate-50/75 text-slate-500 font-bold border-b border-slate-200/85">
                           <th className="p-4">Tanggal</th>

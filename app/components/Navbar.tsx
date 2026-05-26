@@ -27,7 +27,7 @@ export default function Navbar({ currentUser, onLogout, isSupabaseConfigured }: 
   const roleColor = currentUser?.role === 'admin' ? 'bg-brand-blue/10 text-brand-blue' : currentUser?.role === 'kasir' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700';
 
   return (
-    <div className="w-full flex flex-col z-50">
+    <div className="w-full flex flex-col z-50 sticky top-0">
       {/* Supabase Config Banner */}
       {!isSupabaseConfigured && (
         <div className="bg-brand-red text-white py-2 px-4 text-xs font-bold text-center border-b border-brand-red-hover">
@@ -47,7 +47,7 @@ export default function Navbar({ currentUser, onLogout, isSupabaseConfigured }: 
                 alt="V-Dojang Logo"
                 className="w-9 h-9 rounded-xl object-cover shadow-md group-hover:shadow-lg transition-shadow duration-200"
               />
-              <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-brand-red rounded-full border-2 border-white" />
+             
             </div>
             <div className="flex flex-col leading-tight">
               <span className="font-black text-base tracking-tight text-slate-900 group-hover:text-brand-blue transition-colors">V-DOJANG</span>

@@ -185,6 +185,9 @@ export default function DashboardAdmin({
 
   useEffect(() => {
     loadAdminData();
+    if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+      setSidebarOpen(false);
+    }
   }, [activeTabProp]);
 
   // Accept Transaction Handler
@@ -683,11 +686,21 @@ export default function DashboardAdmin({
   return (
     <div className="h-full w-full flex bg-slate-50 text-slate-800 font-sans overflow-hidden">
       {confirmModalEl}
+
+      {/* Mobile Sidebar Backdrop Overlay */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 bg-slate-950/40 backdrop-blur-xs z-30 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
       {/* 1. Left Collapsible Sidebar */}
       <aside
-        className={`${
-          sidebarOpen ? 'w-64' : 'w-[70px]'
-        } h-full bg-[#080c18] text-slate-400 flex flex-col shrink-0 transition-all duration-300 z-40 relative shadow-2xl`}
+        className={`
+          fixed inset-y-0 left-0 lg:relative z-40 h-full bg-[#080c18] text-slate-400 flex flex-col shrink-0 transition-all duration-300 shadow-2xl
+          ${sidebarOpen ? 'w-64 translate-x-0' : 'w-[70px] -translate-x-full lg:translate-x-0 lg:w-[70px]'}
+        `}
       >
         {/* Sidebar Header Brand */}
         <div className={`h-16 flex items-center border-b border-slate-800/40 overflow-hidden shrink-0 transition-all duration-300 ${
@@ -801,14 +814,14 @@ export default function DashboardAdmin({
         </header>
 
         {/* Dynamic Inner Page Content */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6">
           <div className="max-w-7xl mx-auto w-full">
             
             {/* TAB: Ringkasan */}
             {activeTab === 'ringkasan' && (
               <div className="space-y-6 animate-fade-in">
                 {/* Stats Widgets */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                   {/* Card 1: Total Anggota */}
                   <div className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm card-hover flex items-center gap-4">
                     <div className="w-12 h-12 rounded-2xl bg-brand-blue flex items-center justify-center shrink-0 shadow-md shadow-brand-blue/30">
@@ -855,10 +868,10 @@ export default function DashboardAdmin({
                 </div>
 
                 {/* Recent Orders Grid */}
-                <div className="space-y-4 bg-white border border-slate-200/80 p-6 rounded-2xl shadow-xs">
+                <div className="space-y-4 bg-white border border-slate-200/80 p-4 sm:p-6 rounded-2xl shadow-xs">
                   <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Aktivitas Transaksi Terbaru</h3>
-                  <div className="border border-slate-200/85 rounded-xl overflow-hidden bg-white shadow-xs">
-                    <table className="w-full text-left text-xs border-collapse">
+                  <div className="border border-slate-200/85 rounded-xl overflow-x-auto bg-white shadow-xs">
+                    <table className="w-full text-left text-xs border-collapse min-w-[700px]">
                       <thead>
                         <tr className="bg-slate-50/75 text-slate-500 font-bold border-b border-slate-200/85">
                           <th className="p-4">Tanggal</th>
@@ -906,10 +919,10 @@ export default function DashboardAdmin({
 
             {/* TAB: Pesanan & Pembayaran */}
             {activeTab === 'pesanan' && (
-              <div className="space-y-6 bg-white border border-slate-200/80 p-6 rounded-2xl shadow-xs animate-fade-in">
+              <div className="space-y-6 bg-white border border-slate-200/80 p-4 sm:p-6 rounded-2xl shadow-xs animate-fade-in">
                 {transactions.length > 0 ? (
-                  <div className="border border-slate-200/85 rounded-xl overflow-hidden bg-white shadow-xs">
-                    <table className="w-full text-left text-xs border-collapse">
+                  <div className="border border-slate-200/85 rounded-xl overflow-x-auto bg-white shadow-xs">
+                    <table className="w-full text-left text-xs border-collapse min-w-[800px]">
                       <thead>
                         <tr className="bg-slate-50/75 text-slate-500 font-bold border-b border-slate-200/85">
                           <th className="p-4">Tanggal</th>
@@ -1014,7 +1027,7 @@ export default function DashboardAdmin({
 
             {/* TAB: Kelola Produk */}
             {(activeTab === 'produk' || activeTab === 'produk-buat' || activeTab === 'produk-edit') && (
-              <div className="space-y-6 bg-white border border-slate-100 p-6 rounded-2xl shadow-xs animate-fade-in">
+              <div className="space-y-6 bg-white border border-slate-100 p-4 sm:p-6 rounded-2xl shadow-xs animate-fade-in">
                 <div className="flex justify-between items-center gap-4 flex-wrap">
                   <h4 className="font-black text-xs text-slate-450 uppercase tracking-widest">
                     {activeTab === 'produk-buat' ? 'Tambah Produk Baru' : activeTab === 'produk-edit' ? 'Edit Detail Produk' : 'Katalog Toko Aksesoris'}
@@ -1138,8 +1151,8 @@ export default function DashboardAdmin({
                 )}
 
                 {activeTab === 'produk' && (
-                  <div className="border border-slate-100 rounded-xl overflow-hidden bg-white shadow-xs">
-                    <table className="w-full text-left text-xs border-collapse">
+                  <div className="border border-slate-100 rounded-xl overflow-x-auto bg-white shadow-xs">
+                    <table className="w-full text-left text-xs border-collapse min-w-[700px]">
                       <thead>
                         <tr className="bg-slate-50 text-slate-500 font-extrabold border-b border-slate-100">
                           <th className="p-4">Nama Produk</th>
@@ -1171,19 +1184,25 @@ export default function DashboardAdmin({
                               </td>
                               <td className="p-4 text-brand-blue font-bold">Rp {p.price.toLocaleString('id-ID')}</td>
                               <td className="p-4">{p.stock} pcs</td>
-                              <td className="p-4 text-right space-x-2">
-                                <button
-                                  onClick={() => setActiveTab('produk/edit?id=' + p.id)}
-                                  className="text-[9px] font-black uppercase text-brand-blue hover:underline"
-                                >
-                                  Edit
-                                </button>
-                                <button
-                                  onClick={() => handleDeleteProduct(p.id)}
-                                  className="text-[9px] font-black uppercase text-brand-red hover:underline"
-                                >
-                                  Hapus
-                                </button>
+                              <td className="p-4 text-right">
+                                <div className="flex items-center justify-end gap-1.5">
+                                  <button
+                                    onClick={() => setActiveTab('produk/edit?id=' + p.id)}
+                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-brand-blue/8 hover:bg-brand-blue/15 text-brand-blue hover:text-brand-blue-hover border border-brand-blue/15 text-[10px] font-black uppercase tracking-wider rounded-xl transition"
+                                    title="Edit Produk"
+                                  >
+                                    <Edit2 size={12} />
+                                    <span>Edit</span>
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteProduct(p.id)}
+                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 bg-brand-red/8 hover:bg-brand-red/15 text-brand-red hover:text-brand-red-hover border border-brand-red/15 text-[10px] font-black uppercase tracking-wider rounded-xl transition"
+                                    title="Hapus Produk"
+                                  >
+                                    <Trash2 size={12} />
+                                    <span>Hapus</span>
+                                  </button>
+                                </div>
                               </td>
                             </tr>
                           );
@@ -1198,7 +1217,7 @@ export default function DashboardAdmin({
 
             {/* TAB: Kelola Kategori */}
             {activeTab === 'kategori' && (
-              <div className="space-y-6 bg-white border border-slate-100 p-6 rounded-2xl shadow-xs animate-fade-in">
+              <div className="space-y-6 bg-white border border-slate-100 p-4 sm:p-6 rounded-2xl shadow-xs animate-fade-in">
                 <form onSubmit={handleSaveCategory} className="bg-slate-50 border border-slate-100 rounded-xl p-5 space-y-3 max-w-md animate-fade-in">
                   <h4 className="font-black text-xs text-brand-blue uppercase">
                     {editingCategory ? 'Edit Kategori' : 'Tambah Kategori Baru'}
@@ -1230,8 +1249,8 @@ export default function DashboardAdmin({
                   </div>
                 </form>
 
-                <div className="border border-slate-100 rounded-xl overflow-hidden max-w-md bg-white shadow-xs">
-                  <table className="w-full text-left text-xs border-collapse">
+                <div className="border border-slate-100 rounded-xl overflow-x-auto max-w-md bg-white shadow-xs">
+                  <table className="w-full text-left text-xs border-collapse min-w-[400px]">
                     <thead>
                       <tr className="bg-slate-50 text-slate-500 font-extrabold border-b border-slate-100">
                         <th className="p-4">Nama Kategori</th>
@@ -1266,7 +1285,7 @@ export default function DashboardAdmin({
 
             {/* TAB: Laporan Anggota */}
             {activeTab === 'laporan-anggota' && (
-              <div className="space-y-6 bg-white border border-slate-100 p-6 rounded-2xl shadow-xs animate-fade-in">
+              <div className="space-y-6 bg-white border border-slate-100 p-4 sm:p-6 rounded-2xl shadow-xs animate-fade-in">
                 {/* Stats Summary Card Row */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
                   <div className="bg-slate-50 border border-slate-100 rounded-xl p-5">
@@ -1313,8 +1332,8 @@ export default function DashboardAdmin({
 
                 <div className="space-y-3 pt-2">
                   <h4 className="font-black text-slate-800 text-xs uppercase tracking-wider">Tabel Data Keanggotaan</h4>
-                  <div className="border border-slate-100 rounded-xl overflow-hidden bg-white shadow-xs">
-                    <table className="w-full text-left text-xs border-collapse">
+                  <div className="border border-slate-100 rounded-xl overflow-x-auto bg-white shadow-xs">
+                    <table className="w-full text-left text-xs border-collapse min-w-[900px]">
                       <thead>
                         <tr className="bg-slate-50 text-slate-500 font-extrabold border-b border-slate-100">
                           <th className="p-3">Nama Lengkap</th>
@@ -1374,8 +1393,8 @@ export default function DashboardAdmin({
 
                 <div className="space-y-3 pt-6 border-t border-slate-100">
                   <h4 className="font-black text-slate-800 text-xs uppercase tracking-wider">Log Pembayaran Registrasi Anggota</h4>
-                  <div className="border border-slate-100 rounded-xl overflow-hidden bg-white shadow-xs">
-                    <table className="w-full text-left text-xs border-collapse">
+                  <div className="border border-slate-100 rounded-xl overflow-x-auto bg-white shadow-xs">
+                    <table className="w-full text-left text-xs border-collapse min-w-[800px]">
                       <thead>
                         <tr className="bg-slate-50 text-slate-500 font-extrabold border-b border-slate-100">
                           <th className="p-3">Tanggal</th>
@@ -1442,7 +1461,7 @@ export default function DashboardAdmin({
 
             {/* TAB: Laporan Aksesoris */}
             {activeTab === 'laporan-aksesoris' && (
-              <div className="space-y-6 bg-white border border-slate-100 p-6 rounded-2xl shadow-xs animate-fade-in">
+              <div className="space-y-6 bg-white border border-slate-100 p-4 sm:p-6 rounded-2xl shadow-xs animate-fade-in">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                   <div className="bg-slate-50 border border-slate-100 rounded-xl p-5">
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Transaksi</p>
@@ -1469,8 +1488,8 @@ export default function DashboardAdmin({
 
                   <div className="md:col-span-8 space-y-3">
                     <h4 className="font-black text-slate-800 text-xs uppercase tracking-wider">Log Transaksi Toko</h4>
-                    <div className="border border-slate-100 rounded-xl overflow-hidden bg-white shadow-xs">
-                      <table className="w-full text-left text-xs border-collapse">
+                    <div className="border border-slate-100 rounded-xl overflow-x-auto bg-white shadow-xs">
+                      <table className="w-full text-left text-xs border-collapse min-w-[600px]">
                         <thead>
                           <tr className="bg-slate-50 text-slate-500 font-extrabold border-b border-slate-100">
                             <th className="p-3">Tanggal</th>
@@ -1499,7 +1518,7 @@ export default function DashboardAdmin({
 
             {/* TAB: Laporan Event */}
             {activeTab === 'laporan-event' && (
-              <div className="space-y-6 bg-white border border-slate-100 p-6 rounded-2xl shadow-xs animate-fade-in">
+              <div className="space-y-6 bg-white border border-slate-100 p-4 sm:p-6 rounded-2xl shadow-xs animate-fade-in">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                   <div className="bg-slate-50 border border-slate-100 rounded-xl p-5">
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Peserta UKT/Event</p>
@@ -1526,8 +1545,8 @@ export default function DashboardAdmin({
 
                   <div className="md:col-span-7 space-y-3">
                     <h4 className="font-black text-slate-800 text-xs uppercase tracking-wider">Tabel Peserta Kegiatan</h4>
-                    <div className="border border-slate-100 rounded-xl overflow-hidden bg-white shadow-xs">
-                      <table className="w-full text-left text-xs border-collapse">
+                    <div className="border border-slate-100 rounded-xl overflow-x-auto bg-white shadow-xs">
+                      <table className="w-full text-left text-xs border-collapse min-w-[500px]">
                         <thead>
                           <tr className="bg-slate-50 text-slate-500 font-extrabold border-b border-slate-100">
                             <th className="p-3">Tanggal</th>
@@ -1554,7 +1573,7 @@ export default function DashboardAdmin({
 
             {/* TAB: Harga & Bank */}
             {activeTab === 'harga-setting' && (
-              <div className="space-y-8 bg-white border border-slate-100 p-6 rounded-2xl shadow-xs animate-fade-in">
+              <div className="space-y-8 bg-white border border-slate-100 p-4 sm:p-6 rounded-2xl shadow-xs animate-fade-in">
                 <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
                   <form onSubmit={handleSaveSettings} className="bg-slate-50 border border-slate-100 rounded-xl p-5 space-y-4 md:col-span-5 w-full">
                     <h4 className="font-black text-xs text-brand-blue uppercase border-b border-slate-200 pb-2">Informasi Pembayaran</h4>
@@ -1698,8 +1717,8 @@ export default function DashboardAdmin({
                     </form>
                   )}
 
-                  <div className="border border-slate-100 rounded-xl overflow-hidden bg-white">
-                    <table className="w-full text-left text-xs border-collapse">
+                  <div className="border border-slate-100 rounded-xl overflow-x-auto bg-white">
+                    <table className="w-full text-left text-xs border-collapse min-w-[500px]">
                       <thead>
                         <tr className="bg-slate-50 text-slate-500 font-extrabold border-b border-slate-100">
                           <th className="p-3">Nama Event</th>
@@ -1751,7 +1770,7 @@ export default function DashboardAdmin({
 
           {/* TAB: Profil Admin Setting */}
           {activeTab === 'profile-setting' && (
-            <div className="space-y-6 bg-white border border-slate-100 p-6 rounded-2xl shadow-xs animate-fade-in max-w-md">
+            <div className="space-y-6 bg-white border border-slate-100 p-4 sm:p-6 rounded-2xl shadow-xs animate-fade-in max-w-md">
               <form onSubmit={handleSaveProfile} className="space-y-4 w-full">
                 <div>
                   <label className="block text-[10px] font-bold text-slate-500 mb-1">Nama Lengkap Admin</label>

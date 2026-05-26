@@ -1,7 +1,13 @@
 "use client";
 
-import DashboardTabContent from '../DashboardTabContent';
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
 export default function Page() {
-  return <DashboardTabContent activeTab="aksesoris" />;
+  const router = useRouter();
+  useEffect(() => {
+    router.replace('/dashboard/riwayat');
+  }, [router]);
+
+  return null;
 }

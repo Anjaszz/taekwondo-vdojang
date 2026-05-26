@@ -1,11 +1,12 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Event, Product, Category, User } from '../lib/db';
+import { db, Event, Product, Category, User, Transaction, SystemSettings } from '../lib/db';
 import LazyImage from './ui/LazyImage';
+import { useToast } from './ui/ToastProvider';
 import {
   Trophy, Swords, Shield, MapPin, Calendar, Users,
   ShoppingBag, Mail, Phone, ChevronRight, ArrowRight,
-  Ticket, Star, Package, ExternalLink,
+  Ticket, Star, Package, ExternalLink, Loader2, X, CreditCard, UploadCloud, Copy, Check,
 } from 'lucide-react';
 
 interface LandingPageProps {
@@ -28,28 +29,170 @@ export default function LandingPage({
   events, products, categories, currentUser, onDaftarClick, setView,
 }: LandingPageProps) {
   const router = useRouter();
+  const { success: toastSuccess, error: toastError, warning: toastWarning } = useToast();
+
+  // Settings loaded from DB
+  const [settings, setSettings] = useState<SystemSettings | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const handleCopyAccount = () => {
+    if (settings?.bankAccount) {
+      navigator.clipboard.writeText(settings.bankAccount);
+      setCopied(true);
+      toastSuccess('Nomor rekening berhasil disalin!');
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  // Modal / Checkout states
+  const [checkoutItem, setCheckoutItem] = useState<{
+    type: 'UKT' | 'Aksesoris';
+    id: string;
+    name: string;
+    price: number;
+  } | null>(null);
+  const [checkoutFile, setCheckoutFile] = useState<File | null>(null);
+  const [checkoutPreview, setCheckoutPreview] = useState<string>('');
+  const [loading, setLoading] = useState(false);
+
+  // Fetch bank settings on mount
+  useEffect(() => {
+    async function fetchSettings() {
+      try {
+        const setts = await db.getSettings();
+        setSettings(setts);
+      } catch (err) {
+        console.error('Gagal memuat pengaturan pembayaran:', err);
+      }
+    }
+    fetchSettings();
+  }, []);
+
+  // Trigger Checkout Modal
+  const openCheckout = (type: 'UKT' | 'Aksesoris', item: Event | Product) => {
+    setCheckoutItem({
+      type,
+      id: item.id,
+      name: item.name,
+      price: item.price,
+    });
+    setCheckoutFile(null);
+    setCheckoutPreview('');
+  };
+
+  // Detect checkout query parameters on Landing Page and open modal automatically
+  useEffect(() => {
+    if (products.length > 0 && events.length > 0 && settings) {
+      const params = new URLSearchParams(window.location.search);
+      const checkoutProductId = params.get('checkout');
+      const checkoutEventId = params.get('checkoutEvent');
+
+      if (checkoutProductId) {
+        const foundProd = products.find(p => p.id === checkoutProductId);
+        if (foundProd && foundProd.stock > 0) {
+          openCheckout('Aksesoris', foundProd);
+          
+          // Clear query params to clean URL
+          const url = new URL(window.location.href);
+          url.searchParams.delete('checkout');
+          window.history.replaceState({}, '', url.toString());
+        }
+      } else if (checkoutEventId) {
+        const foundEvt = events.find(e => e.id === checkoutEventId);
+        if (foundEvt) {
+          openCheckout('UKT', foundEvt);
+          
+          // Clear query params to clean URL
+          const url = new URL(window.location.href);
+          url.searchParams.delete('checkoutEvent');
+          window.history.replaceState({}, '', url.toString());
+        }
+      }
+    }
+  }, [products, events, settings]);
 
   const handleBuyProduct = (prodId: string) => {
     if (currentUser) {
       if (currentUser.role === 'anggota') {
-        router.push(`/dashboard/aksesoris?checkout=${prodId}`);
+        const foundProd = products.find(p => p.id === prodId);
+        if (foundProd && foundProd.stock > 0) {
+          openCheckout('Aksesoris', foundProd);
+        }
       } else {
         router.push('/dashboard');
       }
     } else {
-      router.push(`/login?redirect=/dashboard/aksesoris?checkout=${prodId}`);
+      router.push(`/login?redirect=/?checkout=${prodId}`);
     }
   };
 
   const handleRegisterEvent = (evtId: string) => {
     if (currentUser) {
       if (currentUser.role === 'anggota') {
-        router.push(`/dashboard/kegiatan?checkoutEvent=${evtId}`);
+        const foundEvt = events.find(e => e.id === evtId);
+        if (foundEvt) {
+          openCheckout('UKT', foundEvt);
+        }
       } else {
         router.push('/dashboard');
       }
     } else {
-      router.push(`/login?redirect=/dashboard/kegiatan?checkoutEvent=${evtId}`);
+      router.push(`/login?redirect=/?checkoutEvent=${evtId}`);
+    }
+  };
+
+  // Handle Checkout Upload File
+  const handleCheckoutFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setCheckoutFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setCheckoutPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // Submit Purchase/Registration Checkout
+  const handleCheckoutSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentUser || !checkoutItem || !settings) return;
+    if (!checkoutFile && !checkoutPreview) {
+      toastWarning('Harap unggah bukti transfer pembayaran.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const uploadData = checkoutFile || checkoutPreview;
+      const imageUrl = await db.uploadImage(uploadData);
+
+      const newTx: Transaction = {
+        id: 'tx-' + Date.now(),
+        memberId: currentUser.id,
+        memberName: currentUser.name,
+        type: checkoutItem.type,
+        details: `${checkoutItem.type === 'UKT' ? 'Pendaftaran Event' : 'Pembelian Aksesoris'}: ${checkoutItem.name}`,
+        amount: checkoutItem.price,
+        proofImage: imageUrl,
+        status: 'Pending',
+        date: new Date().toISOString().split('T')[0],
+      };
+
+      await db.addTransaction(newTx);
+      setCheckoutItem(null);
+      toastSuccess('Pembayaran berhasil dikirim! Mengarahkan Anda ke Riwayat Transaksi...');
+      
+      // Redirect to member dashboard transaction history after short delay
+      setTimeout(() => {
+        router.push('/dashboard/riwayat');
+      }, 1500);
+    } catch (err) {
+      console.error(err);
+      toastError('Gagal mengirim bukti pembayaran.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -140,6 +283,13 @@ export default function LandingPage({
             <p className="text-slate-500 mt-3 max-w-xl mx-auto text-sm font-medium leading-relaxed">
               Tiga pilar program latihan terintegrasi yang membentuk atlet berprestasi sekaligus generasi berkarakter.
             </p>
+            <div className="mt-6 flex justify-center">
+              <img
+                src="/v-dojang.jpeg"
+                alt="V-Dojang Logo"
+                className="w-40 h-40 rounded-[2rem] object-cover shadow-xl border-4 border-white hover:scale-105 transition-all duration-300"
+              />
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -511,7 +661,7 @@ export default function LandingPage({
           <div>
             <h5 className="font-black text-white text-xs mb-5 uppercase tracking-widest">Metode Bayar</h5>
             <ul className="space-y-2.5 text-xs font-medium">
-              {['Transfer Bank Mandiri / BCA / BNI', 'Review Bukti Bayar Instan', 'Konfirmasi via Dashboard'].map(item => (
+              {['Transfer Bank BCA', 'Review Bukti Bayar Instan', 'Konfirmasi oleh admin'].map(item => (
                 <li key={item} className="flex items-center gap-2">
                   <span className="w-1 h-1 rounded-full bg-slate-600" />
                   {item}
@@ -526,6 +676,97 @@ export default function LandingPage({
           <span className="flex items-center gap-1">Built with <span className="text-brand-red">♥</span> for Indonesian Taekwondo</span>
         </div>
       </footer>
+
+      {/* CHECKOUT MODAL */}
+      {checkoutItem && settings && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-2xl border border-slate-100 w-full max-w-sm overflow-hidden shadow-lg animate-fade-in animate-duration-150">
+            <div className="border-b border-slate-100 p-5 flex justify-between items-center font-sans">
+              <div>
+                <h3 className="font-black text-sm text-slate-800">Checkout Pembayaran</h3>
+                <p className="text-[9px] text-slate-400 uppercase tracking-widest mt-0.5">{checkoutItem.type}</p>
+              </div>
+              <button onClick={() => setCheckoutItem(null)} className="text-slate-400 hover:text-slate-600 font-bold">
+                ✕
+              </button>
+            </div>
+
+            <div className="p-6 space-y-6 font-sans">
+              <div>
+                <p className="text-[9px] font-black uppercase text-slate-400">Rincian:</p>
+                <h4 className="font-extrabold text-slate-800 text-sm mt-0.5 leading-snug">{checkoutItem.name}</h4>
+              </div>
+
+              <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 text-center space-y-3">
+                <div>
+                  <p className="text-[9px] font-black text-slate-400 uppercase">Transfer Nominal</p>
+                  <p className="text-xl font-black text-brand-blue">
+                    Rp {checkoutItem.price.toLocaleString('id-ID')}
+                  </p>
+                </div>
+                <div className="border-t border-slate-200/50 pt-2.5 text-[11px] font-semibold text-slate-500 space-y-0.5">
+                  <p>Kirim ke rekening resmi:</p>
+                  <p className="font-bold text-slate-800">{settings.bankName}</p>
+                  <div className="flex items-center justify-center gap-2 my-1">
+                    <p className="font-black text-base text-brand-red tracking-wider leading-none">{settings.bankAccount}</p>
+                    <button
+                      type="button"
+                      onClick={handleCopyAccount}
+                      className="p-1 hover:bg-slate-100 active:bg-slate-200 rounded-lg text-slate-400 hover:text-slate-600 transition flex items-center justify-center border border-slate-200/50 bg-white shadow-xs"
+                    >
+                      {copied ? <Check size={11} className="text-emerald-500" /> : <Copy size={11} />}
+                    </button>
+                  </div>
+                  <p className="text-[9px]">a/n {settings.bankRecipient}</p>
+                </div>
+              </div>
+
+              <form onSubmit={handleCheckoutSubmit} className="space-y-4">
+                <div className="space-y-1">
+                  <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider">
+                    Upload File Bukti Transfer
+                  </label>
+                  <div className="flex flex-col items-center justify-center border border-dashed border-slate-200 hover:border-brand-blue/30 rounded-xl p-4 transition bg-slate-50/20 cursor-pointer relative">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleCheckoutFileChange}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                      required
+                    />
+                    {checkoutPreview ? (
+                      <img src={checkoutPreview} alt="Bukti" className="max-h-24 object-contain rounded-lg" />
+                    ) : (
+                      <div className="text-center">
+                        <span className="text-xl block">📸</span>
+                        <p className="font-bold text-[10px] text-slate-500 mt-1">Pilih Foto Bukti Struk</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full py-3 bg-brand-red hover:bg-brand-red-hover text-white text-xs font-black uppercase tracking-wider rounded-xl transition flex items-center justify-center gap-2"
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 size={14} className="animate-spin" />
+                      Mengirim...
+                    </>
+                  ) : (
+                    <>
+                      <CreditCard size={14} />
+                      Kirim Bukti Pembayaran
+                    </>
+                  )}
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

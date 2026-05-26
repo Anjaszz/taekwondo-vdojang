@@ -14,7 +14,7 @@ interface DashboardAnggotaProps {
   setActiveTabProp: (tab: string) => void;
 }
 
-type TabType = 'profil' | 'riwayat' | 'kegiatan' | 'aksesoris';
+type TabType = 'profil' | 'riwayat' | 'kegiatan';
 
 export default function DashboardAnggota({
   user,
@@ -125,42 +125,7 @@ export default function DashboardAnggota({
     setCheckoutPreview('');
   };
 
-  // Detect checkout query parameters and open checkout modal automatically
-  useEffect(() => {
-    if (products.length > 0 && events.length > 0 && settings) {
-      const params = new URLSearchParams(window.location.search);
-      const checkoutProductId = params.get('checkout');
-      const checkoutEventId = params.get('checkoutEvent');
 
-      if (checkoutProductId) {
-        const foundProd = products.find(p => p.id === checkoutProductId);
-        if (foundProd && foundProd.stock > 0) {
-          openCheckout('Aksesoris', foundProd);
-          
-          // Clear query params to clean URL
-          const url = new URL(window.location.href);
-          url.searchParams.delete('checkout');
-          window.history.replaceState({}, '', url.toString());
-        }
-      } else if (checkoutEventId) {
-        const foundEvt = events.find(e => e.id === checkoutEventId);
-        if (foundEvt) {
-          // Check if already registered or approved to prevent duplicate purchases
-          const isRegistered = transactions.some(
-            t => t.type === 'UKT' && t.details.includes(foundEvt.name) && (t.status === 'Pending' || t.status === 'Berhasil')
-          );
-          if (!isRegistered) {
-            openCheckout('UKT', foundEvt);
-          }
-          
-          // Clear query params to clean URL
-          const url = new URL(window.location.href);
-          url.searchParams.delete('checkoutEvent');
-          window.history.replaceState({}, '', url.toString());
-        }
-      }
-    }
-  }, [products, events, settings, transactions]);
 
   // Handle Checkout Upload File
   const handleCheckoutFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -361,14 +326,6 @@ export default function DashboardAnggota({
             }`}
           >
             🏆 Event & UKT
-          </button>
-          <button
-            onClick={() => setActiveTab('aksesoris')}
-            className={`w-full py-2.5 px-3 rounded-xl text-left text-xs font-black uppercase tracking-wider transition ${
-              activeTab === 'aksesoris' ? 'bg-brand-blue text-white shadow-xs' : 'text-slate-500 hover:bg-slate-50'
-            }`}
-          >
-            🛍️ Toko Peralatan
           </button>
         </aside>
 
@@ -581,58 +538,6 @@ export default function DashboardAnggota({
             </div>
           )}
 
-          {/* TAB: Aksesoris */}
-          {activeTab === 'aksesoris' && (
-            <div className="space-y-6">
-              <div>
-                <h3 className="text-lg font-black text-slate-800">Toko Kelengkapan Latihan</h3>
-                <p className="text-slate-400 text-xs mt-0.5">Beli dobok, deker, target kick, atau pelindung badan resmi.</p>
-              </div>
-
-              {categories.map(cat => {
-                const catProducts = products.filter(p => p.categoryId === cat.id);
-                if (catProducts.length === 0) return null;
-
-                return (
-                  <div key={cat.id} className="space-y-3 pt-2">
-                    <h4 className="font-black text-[10px] text-slate-400 uppercase tracking-widest border-b border-slate-100 pb-1">
-                      {cat.name}
-                    </h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {catProducts.map(prod => (
-                        <div key={prod.id} className="border border-slate-100 rounded-xl p-4 bg-slate-50/10 hover:bg-slate-50/40 transition flex gap-4 items-center">
-                          <div className="w-12 h-12 rounded-lg bg-slate-100 overflow-hidden flex items-center justify-center text-xl shrink-0 animate-fade-in">
-                            {prod.image ? (
-                              <img src={prod.image} alt={prod.name} className="w-full h-full object-cover" />
-                            ) : (
-                              '🥋'
-                            )}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <h5 className="font-extrabold text-slate-800 text-xs truncate leading-tight">{prod.name}</h5>
-                            <p className="text-[10px] text-slate-400 line-clamp-1 mt-0.5">{prod.description}</p>
-                            <div className="flex justify-between items-center mt-2">
-                              <span className="font-black text-brand-blue text-xs">
-                                Rp {prod.price.toLocaleString('id-ID')}
-                              </span>
-                              <span className="text-[9px] text-slate-400 font-bold">Stok: {prod.stock}</span>
-                            </div>
-                            <button
-                              onClick={() => openCheckout('Aksesoris', prod)}
-                              disabled={prod.stock === 0}
-                              className="mt-2.5 bg-brand-red hover:bg-brand-red-hover disabled:bg-slate-200 disabled:text-slate-400 text-white text-[9px] font-black uppercase tracking-wider px-3 py-1.5 rounded-lg transition"
-                            >
-                              {prod.stock === 0 ? 'Habis' : 'Beli'}
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
         </main>
       </div>
 
