@@ -8,7 +8,7 @@ import {
   Menu, Eye, EyeOff, Save, Plus, Edit2, Trash2, X,
   TrendingUp, ShoppingBag, AlertCircle, CheckCircle2, Clock,
   Upload, ImageIcon, Calendar, MapPin, Mail, Phone, Award, Copy,
-  ExternalLink, Loader2,
+  ExternalLink, Loader2, FileSpreadsheet, Printer,
 } from 'lucide-react';
 
 interface DashboardAdminProps {
@@ -533,6 +533,56 @@ export default function DashboardAdmin({
     acc[evtNameClean].count += 1;
     return acc;
   }, {});
+
+  // ── Export Helpers ────────────────────────────────────────────────────
+  const exportToCSV = (filename: string, headers: string[], rows: (string | number)[][]) => {
+    const BOM = '\uFEFF'; // UTF-8 BOM for Excel compatibility
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row =>
+        row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')
+      ),
+    ].join('\n');
+    const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${filename}_${new Date().toISOString().slice(0, 10)}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+    toastSuccess(`File ${filename}.csv berhasil diunduh!`);
+  };
+
+  const exportToPDF = (title: string, printAreaId: string) => {
+    const el = document.getElementById(printAreaId);
+    if (!el) return;
+    const printWindow = window.open('', '_blank', 'width=900,height=700');
+    if (!printWindow) return;
+    printWindow.document.write(`
+      <html><head><title>${title}</title>
+      <style>
+        * { box-sizing: border-box; font-family: Arial, sans-serif; }
+        body { margin: 24px; color: #1e293b; }
+        h1 { font-size: 18px; font-weight: 900; margin-bottom: 4px; }
+        p.subtitle { font-size: 11px; color: #64748b; margin-bottom: 20px; }
+        table { width: 100%; border-collapse: collapse; font-size: 11px; }
+        th { background: #f1f5f9; color: #475569; font-weight: 800; padding: 8px 10px; text-align: left; border-bottom: 2px solid #e2e8f0; }
+        td { padding: 7px 10px; border-bottom: 1px solid #f1f5f9; color: #334155; }
+        tr:nth-child(even) td { background: #f8fafc; }
+        .badge-aktif { background: #ecfdf5; color: #059669; padding: 2px 8px; border-radius: 999px; font-size: 9px; font-weight: 800; }
+        .badge-nonaktif { background: #fff1f2; color: #e11d48; padding: 2px 8px; border-radius: 999px; font-size: 9px; font-weight: 800; }
+        @media print { body { margin: 12px; } }
+      </style>
+      </head><body>
+      <h1>${title}</h1>
+      <p class="subtitle">Dicetak pada: ${new Date().toLocaleString('id-ID')} &nbsp;|&nbsp; V-Dojang Taekwondo</p>
+      ${el.innerHTML}
+      </body></html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => { printWindow.print(); printWindow.close(); }, 500);
+  };
 
   const renderPagination = (
     currentPage: number,
@@ -1301,6 +1351,31 @@ export default function DashboardAdmin({
             {/* TAB: Laporan Anggota */}
             {activeTab === 'laporan-anggota' && (
               <div className="space-y-6 bg-white border border-slate-100 p-4 sm:p-6 rounded-2xl shadow-xs animate-fade-in">
+                {/* Export Buttons */}
+                <div className="flex items-center justify-between flex-wrap gap-3 pb-4 border-b border-slate-100">
+                  <div>
+                    <h3 className="text-sm font-black text-slate-800">Laporan Data Anggota</h3>
+                    <p className="text-[10px] text-slate-400 mt-0.5">{users.filter(u => u.role === 'anggota').length} anggota terdaftar</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => exportToCSV('laporan-anggota', ['Nama Lengkap', 'Dojang', 'Kontak', 'Gender', 'Jenjang', 'Sabuk', 'Status'],
+                        users.filter(u => u.role === 'anggota').map(u => [u.name, u.dojang || '-', u.phone || '-', u.gender || '-', u.jenjang || '-', u.belt || '-', u.status || '-'])
+                      )}
+                      className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-[10px] font-black uppercase tracking-wider transition"
+                    >
+                      <FileSpreadsheet size={13} />
+                      Export Excel
+                    </button>
+                    <button
+                      onClick={() => exportToPDF('Laporan Data Anggota', 'print-laporan-anggota')}
+                      className="inline-flex items-center gap-1.5 px-3 py-2 bg-brand-red/8 hover:bg-brand-red/15 text-brand-red border border-brand-red/15 rounded-xl text-[10px] font-black uppercase tracking-wider transition"
+                    >
+                      <Printer size={13} />
+                      Cetak PDF
+                    </button>
+                  </div>
+                </div>
                 {/* Stats Summary Card Row */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
                   <div className="bg-slate-50 border border-slate-100 rounded-xl p-5">
@@ -1345,7 +1420,7 @@ export default function DashboardAdmin({
                   </div>
                 </div>
 
-                <div className="space-y-3 pt-2">
+                <div id="print-laporan-anggota" className="space-y-3 pt-2">
                   <h4 className="font-black text-slate-800 text-xs uppercase tracking-wider">Tabel Data Keanggotaan</h4>
                   <div className="border border-slate-100 rounded-xl overflow-x-auto bg-white shadow-xs">
                     <table className="w-full text-left text-xs border-collapse min-w-[900px]">
@@ -1477,6 +1552,31 @@ export default function DashboardAdmin({
             {/* TAB: Laporan Aksesoris */}
             {activeTab === 'laporan-aksesoris' && (
               <div className="space-y-6 bg-white border border-slate-100 p-4 sm:p-6 rounded-2xl shadow-xs animate-fade-in">
+                {/* Export Buttons */}
+                <div className="flex items-center justify-between flex-wrap gap-3 pb-4 border-b border-slate-100">
+                  <div>
+                    <h3 className="text-sm font-black text-slate-800">Laporan Penjualan Aksesoris</h3>
+                    <p className="text-[10px] text-slate-400 mt-0.5">{accessoryTx.length} transaksi berhasil</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => exportToCSV('laporan-aksesoris', ['Tanggal', 'Nama Anggota', 'Deskripsi Barang', 'Subtotal (Rp)'],
+                        accessoryTx.map(tx => [tx.date, tx.memberName, tx.details, tx.amount])
+                      )}
+                      className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-[10px] font-black uppercase tracking-wider transition"
+                    >
+                      <FileSpreadsheet size={13} />
+                      Export Excel
+                    </button>
+                    <button
+                      onClick={() => exportToPDF('Laporan Penjualan Aksesoris', 'print-laporan-aksesoris')}
+                      className="inline-flex items-center gap-1.5 px-3 py-2 bg-brand-red/8 hover:bg-brand-red/15 text-brand-red border border-brand-red/15 rounded-xl text-[10px] font-black uppercase tracking-wider transition"
+                    >
+                      <Printer size={13} />
+                      Cetak PDF
+                    </button>
+                  </div>
+                </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                   <div className="bg-slate-50 border border-slate-100 rounded-xl p-5">
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Transaksi</p>
@@ -1501,7 +1601,7 @@ export default function DashboardAdmin({
                     </div>
                   </div>
 
-                  <div className="md:col-span-8 space-y-3">
+                  <div id="print-laporan-aksesoris" className="md:col-span-8 space-y-3">
                     <h4 className="font-black text-slate-800 text-xs uppercase tracking-wider">Log Transaksi Toko</h4>
                     <div className="border border-slate-100 rounded-xl overflow-x-auto bg-white shadow-xs">
                       <table className="w-full text-left text-xs border-collapse min-w-[600px]">
@@ -1534,6 +1634,31 @@ export default function DashboardAdmin({
             {/* TAB: Laporan Event */}
             {activeTab === 'laporan-event' && (
               <div className="space-y-6 bg-white border border-slate-100 p-4 sm:p-6 rounded-2xl shadow-xs animate-fade-in">
+                {/* Export Buttons */}
+                <div className="flex items-center justify-between flex-wrap gap-3 pb-4 border-b border-slate-100">
+                  <div>
+                    <h3 className="text-sm font-black text-slate-800">Laporan Event &amp; UKT</h3>
+                    <p className="text-[10px] text-slate-400 mt-0.5">{eventTx.length} peserta terdaftar</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => exportToCSV('laporan-event-ukt', ['Tanggal', 'Nama Anggota', 'Detail Kegiatan', 'Nominal (Rp)'],
+                        eventTx.map(tx => [tx.date, tx.memberName, tx.details, tx.amount])
+                      )}
+                      className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-[10px] font-black uppercase tracking-wider transition"
+                    >
+                      <FileSpreadsheet size={13} />
+                      Export Excel
+                    </button>
+                    <button
+                      onClick={() => exportToPDF('Laporan Event & UKT', 'print-laporan-event')}
+                      className="inline-flex items-center gap-1.5 px-3 py-2 bg-brand-red/8 hover:bg-brand-red/15 text-brand-red border border-brand-red/15 rounded-xl text-[10px] font-black uppercase tracking-wider transition"
+                    >
+                      <Printer size={13} />
+                      Cetak PDF
+                    </button>
+                  </div>
+                </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                   <div className="bg-slate-50 border border-slate-100 rounded-xl p-5">
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Peserta UKT/Event</p>
@@ -1558,7 +1683,7 @@ export default function DashboardAdmin({
                     </div>
                   </div>
 
-                  <div className="md:col-span-7 space-y-3">
+                  <div id="print-laporan-event" className="md:col-span-7 space-y-3">
                     <h4 className="font-black text-slate-800 text-xs uppercase tracking-wider">Tabel Peserta Kegiatan</h4>
                     <div className="border border-slate-100 rounded-xl overflow-x-auto bg-white shadow-xs">
                       <table className="w-full text-left text-xs border-collapse min-w-[500px]">
