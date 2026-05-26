@@ -24,7 +24,16 @@ export default function LoginPage() {
       try {
         const parsed = JSON.parse(savedUser);
         setCurrentUser(parsed);
-        router.push('/dashboard');
+        
+        let targetPath = '/dashboard';
+        if (typeof window !== 'undefined') {
+          const params = new URLSearchParams(window.location.search);
+          const redirect = params.get('redirect');
+          if (redirect) {
+            targetPath = redirect;
+          }
+        }
+        router.push(targetPath);
       } catch (e) { console.error(e); }
     }
   }, [router]);
@@ -47,7 +56,16 @@ export default function LoginPage() {
         setCurrentUser(matched);
         setLoginEmail('');
         setLoginPassword('');
-        router.push('/dashboard');
+        
+        let targetPath = '/dashboard';
+        if (typeof window !== 'undefined') {
+          const params = new URLSearchParams(window.location.search);
+          const redirect = params.get('redirect');
+          if (redirect) {
+            targetPath = redirect;
+          }
+        }
+        router.push(targetPath);
         router.refresh();
       } else {
         setLoginError('Email atau kata sandi salah. Silakan coba lagi.');

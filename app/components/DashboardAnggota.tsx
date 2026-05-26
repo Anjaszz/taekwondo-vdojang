@@ -125,6 +125,43 @@ export default function DashboardAnggota({
     setCheckoutPreview('');
   };
 
+  // Detect checkout query parameters and open checkout modal automatically
+  useEffect(() => {
+    if (products.length > 0 && events.length > 0 && settings) {
+      const params = new URLSearchParams(window.location.search);
+      const checkoutProductId = params.get('checkout');
+      const checkoutEventId = params.get('checkoutEvent');
+
+      if (checkoutProductId) {
+        const foundProd = products.find(p => p.id === checkoutProductId);
+        if (foundProd && foundProd.stock > 0) {
+          openCheckout('Aksesoris', foundProd);
+          
+          // Clear query params to clean URL
+          const url = new URL(window.location.href);
+          url.searchParams.delete('checkout');
+          window.history.replaceState({}, '', url.toString());
+        }
+      } else if (checkoutEventId) {
+        const foundEvt = events.find(e => e.id === checkoutEventId);
+        if (foundEvt) {
+          // Check if already registered or approved to prevent duplicate purchases
+          const isRegistered = transactions.some(
+            t => t.type === 'UKT' && t.details.includes(foundEvt.name) && (t.status === 'Pending' || t.status === 'Berhasil')
+          );
+          if (!isRegistered) {
+            openCheckout('UKT', foundEvt);
+          }
+          
+          // Clear query params to clean URL
+          const url = new URL(window.location.href);
+          url.searchParams.delete('checkoutEvent');
+          window.history.replaceState({}, '', url.toString());
+        }
+      }
+    }
+  }, [products, events, settings, transactions]);
+
   // Handle Checkout Upload File
   const handleCheckoutFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

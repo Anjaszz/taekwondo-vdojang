@@ -1,4 +1,5 @@
 import React from 'react';
+import { useRouter } from 'next/navigation';
 import { Event, Product, Category, User } from '../lib/db';
 import LazyImage from './ui/LazyImage';
 import {
@@ -26,6 +27,32 @@ const SectionLabel = ({ children }: { children: React.ReactNode }) => (
 export default function LandingPage({
   events, products, categories, currentUser, onDaftarClick, setView,
 }: LandingPageProps) {
+  const router = useRouter();
+
+  const handleBuyProduct = (prodId: string) => {
+    if (currentUser) {
+      if (currentUser.role === 'anggota') {
+        router.push(`/dashboard/aksesoris?checkout=${prodId}`);
+      } else {
+        router.push('/dashboard');
+      }
+    } else {
+      router.push(`/login?redirect=/dashboard/aksesoris?checkout=${prodId}`);
+    }
+  };
+
+  const handleRegisterEvent = (evtId: string) => {
+    if (currentUser) {
+      if (currentUser.role === 'anggota') {
+        router.push(`/dashboard/kegiatan?checkoutEvent=${evtId}`);
+      } else {
+        router.push('/dashboard');
+      }
+    } else {
+      router.push(`/login?redirect=/dashboard/kegiatan?checkoutEvent=${evtId}`);
+    }
+  };
+
   return (
     <div className="w-full flex flex-col bg-white overflow-x-hidden font-sans">
 
@@ -228,7 +255,7 @@ export default function LandingPage({
                               Rp {prod.price.toLocaleString('id-ID')}
                             </span>
                             <button
-                              onClick={() => setView(currentUser ? 'dashboard' : 'login')}
+                              onClick={() => handleBuyProduct(prod.id)}
                               disabled={prod.stock === 0}
                               className="flex items-center gap-1 px-3 py-1.5 bg-brand-red hover:bg-brand-red-hover disabled:bg-slate-200 disabled:text-slate-400 text-white text-[10px] font-black uppercase tracking-wider rounded-lg transition"
                             >
@@ -380,7 +407,7 @@ export default function LandingPage({
                     </div>
 
                     <button
-                      onClick={() => setView(currentUser ? 'dashboard' : 'login')}
+                      onClick={() => handleRegisterEvent(evt.id)}
                       className="w-full py-2.5 border border-brand-blue/30 text-brand-blue font-bold rounded-xl text-xs hover:bg-brand-blue hover:text-white hover:border-brand-blue transition duration-200 uppercase tracking-wider flex items-center justify-center gap-1.5"
                     >
                       {currentUser ? 'Daftar Event' : 'Masuk & Daftar'}
