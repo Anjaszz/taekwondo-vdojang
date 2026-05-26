@@ -49,6 +49,7 @@ export default function DaftarForm({
   const [password, setPassword] = useState('');
   const [jenjang, setJenjang] = useState<'SD' | 'SMP' | 'SMA/SMK' | 'Umum'>('SD');
   const [dojang, setDojang] = useState('');
+  const [belt, setBelt] = useState('Sabuk Putih');
   const [gender, setGender] = useState<'Laki-laki' | 'Perempuan'>('Laki-laki');
   const [age, setAge] = useState<number | ''>('');
   const [showPassword, setShowPassword] = useState(false);
@@ -105,7 +106,7 @@ export default function DaftarForm({
         age: Number(age),
         jenjang: jenjang,
         dojang: dojang,
-        belt: 'Sabuk Putih',
+        belt: belt,
         status: 'Nonaktif',
         password: password,
       };
@@ -401,7 +402,7 @@ export default function DaftarForm({
               </div>
 
               {/* Nama Tempat Latihan (Dojang) */}
-              <div className="space-y-1.5 md:col-span-2">
+              <div className="space-y-1.5">
                 <label className="block text-[11px] font-black uppercase text-slate-400 tracking-wider">
                   Nama Tempat Latihan (Dojang)
                 </label>
@@ -413,10 +414,37 @@ export default function DaftarForm({
                     type="text"
                     value={dojang}
                     onChange={e => setDojang(e.target.value)}
-                    placeholder="Contoh: Dojang Senayan, Dojang Garuda Depok"
+                    placeholder="Contoh: Dojang Senayan"
                     className="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-200 text-sm font-semibold text-slate-800 placeholder:text-slate-300 focus:outline-none focus:border-brand-blue focus:ring-1 focus:ring-brand-blue/30 transition bg-white"
                     required
                   />
+                </div>
+              </div>
+
+              {/* Sabuk Terakhir */}
+              <div className="space-y-1.5">
+                <label className="block text-[11px] font-black uppercase text-slate-400 tracking-wider">
+                  Sabuk Terakhir
+                </label>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none z-10">
+                    <Award size={16} />
+                  </span>
+                  <select
+                    value={belt}
+                    onChange={e => setBelt(e.target.value)}
+                    className="w-full pl-11 pr-10 py-3 rounded-xl border border-slate-200 text-sm font-semibold text-slate-800 focus:outline-none focus:border-brand-blue focus:ring-1 focus:ring-brand-blue/30 transition bg-white appearance-none cursor-pointer"
+                  >
+                    <option value="Sabuk Putih">⬜ Sabuk Putih</option>
+                    <option value="Sabuk Kuning">🟨 Sabuk Kuning</option>
+                    <option value="Sabuk Hijau">🟩 Sabuk Hijau</option>
+                    <option value="Sabuk Biru">🟦 Sabuk Biru</option>
+                    <option value="Sabuk Merah">🟥 Sabuk Merah</option>
+                    <option value="Sabuk Hitam">⬛ Sabuk Hitam</option>
+                  </select>
+                  <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 text-[10px]">
+                    ▼
+                  </div>
                 </div>
               </div>
 

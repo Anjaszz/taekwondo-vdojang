@@ -230,7 +230,7 @@ export default function LandingPage({
 
             {/* Stats row */}
             <div className="flex gap-6 text-center">
-              {[['200+', 'Anggota Aktif'], ['8+', 'Tahun Berdiri'], ['3', 'Dojang Cabang']].map(([num, label]) => (
+              {[['200+', 'Anggota Aktif'], ['26+', 'Tahun Berdiri'], ['3', 'Dojang Cabang']].map(([num, label]) => (
                 <div key={label}>
                   <p className="text-2xl font-black text-brand-blue">{num}</p>
                   <p className="text-[11px] text-slate-400 font-semibold uppercase tracking-wide">{label}</p>
@@ -435,29 +435,26 @@ export default function LandingPage({
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {[
               {
-                badge: 'Pusat Senayan',
-                name: 'Dojang Merdeka Jakarta',
-                address: 'Jl. Merdeka No. 12, Senayan, Jakarta Pusat',
-                schedule: 'Selasa & Kamis (16.00)',
-                coach: 'Budi Santoso, DAN IV',
+                badge: 'Cikunir',
+                name: 'Waterfall Cikunir',
+                address: 'Jl. Waterfall Raya, Cikunir, Bekasi',
+                schedule: 'Minggu (16.00 s/d 18.00)',
                 gradient: 'from-brand-blue/8 to-brand-blue/3',
                 accent: 'brand-blue',
               },
               {
-                badge: 'Depok Cabang',
-                name: 'Dojang Garuda Depok',
-                address: 'GOR Depok, Jl. Margonda Raya No. 45',
-                schedule: 'Rabu & Sabtu (15.30)',
-                coach: 'Siti Rahma, DAN III',
+                badge: 'UNM',
+                name: 'Universitas Nusa Mandiri',
+                address: 'Kampus Universitas Nusa Mandiri, Jakarta',
+                schedule: 'Selasa (19.00 s/d 21.00)',
                 gradient: 'from-violet-50 to-violet-50/20',
                 accent: 'violet-600',
               },
               {
-                badge: 'Bekasi Cabang',
-                name: 'Dojang Harapan Bekasi',
-                address: 'Harapan Indah Blok B/14, Bekasi Barat',
-                schedule: 'Jumat & Minggu (16.00)',
-                coach: 'Andi Wijaya, DAN V',
+                badge: 'SMPN 252',
+                name: 'Smpn 252 Jakarta Timur',
+                address: 'Jl. H. Naman No. 1, Pondok Kelapa, Duren Sawit, Jakarta Timur',
+                schedule: 'Rabu & Sabtu (18.00 s/d 20.00)',
                 gradient: 'from-brand-red/8 to-brand-red/3',
                 accent: 'brand-red',
               },
@@ -467,7 +464,7 @@ export default function LandingPage({
                   <div className="w-10 h-10 rounded-xl bg-white border border-slate-100 shadow-sm flex items-center justify-center">
                     <Shield size={18} className="text-brand-blue" />
                   </div>
-                  <span className="bg-white border border-slate-100 text-slate-600 text-[9px] font-black uppercase px-2.5 py-1 rounded-full shadow-sm">
+                  <span className="bg-white border border-slate-100 text-slate-650 text-[9px] font-black uppercase px-2.5 py-1 rounded-full shadow-sm">
                     {d.badge}
                   </span>
                 </div>
@@ -482,10 +479,6 @@ export default function LandingPage({
                   <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
                     <Calendar size={13} className="shrink-0 text-slate-400" />
                     <span>{d.schedule}</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
-                    <Users size={13} className="shrink-0 text-slate-400" />
-                    <span>{d.coach}</span>
                   </div>
                 </div>
 
@@ -635,16 +628,25 @@ export default function LandingPage({
             <ul className="space-y-2.5 text-xs font-medium">
               <li className="flex items-center gap-2">
                 <Mail size={12} className="text-slate-500 shrink-0" />
-                info@vdojang.com
+                <a 
+                  href="mailto:info@vdojang.com" 
+                  className="hover:text-white transition-colors duration-200"
+                >
+                  info@vdojang.com
+                </a>
               </li>
               <li className="flex items-center gap-2">
                 <Phone size={12} className="text-slate-500 shrink-0" />
-                +62 812-3456-7890
+                <a 
+                  href="https://wa.me/6281213890279" 
+                  target="_blank" 
+                  rel="noopener noreferrer" 
+                  className="hover:text-white transition-colors duration-200"
+                >
+                  +62 812-1389-0279
+                </a>
               </li>
-              <li className="flex items-start gap-2">
-                <MapPin size={12} className="text-slate-500 shrink-0 mt-0.5" />
-                GOR Merdeka, Senayan, Jakarta
-              </li>
+             
             </ul>
           </div>
 

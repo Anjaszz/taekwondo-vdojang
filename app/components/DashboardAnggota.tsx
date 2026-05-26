@@ -45,6 +45,7 @@ export default function DashboardAnggota({
   const [profileAge, setProfileAge] = useState(user.age || 0);
   const [profileGender, setProfileGender] = useState<'Laki-laki' | 'Perempuan'>(user.gender || 'Laki-laki');
   const [profileDojang, setProfileDojang] = useState(user.dojang || '');
+  const [profileBelt, setProfileBelt] = useState(user.belt || 'Sabuk Putih');
 
   // Operation States
   const [loading, setLoading] = useState(false);
@@ -100,6 +101,7 @@ export default function DashboardAnggota({
         age: Number(profileAge),
         gender: profileGender,
         dojang: profileDojang,
+        belt: profileBelt,
       };
 
       await db.updateUser(updatedUser);
@@ -388,15 +390,32 @@ export default function DashboardAnggota({
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1.5">Dojang / Cabang Latihan</label>
-                  <input
-                    type="text"
-                    value={profileDojang}
-                    onChange={e => setProfileDojang(e.target.value)}
-                    className="w-full px-4 py-2 rounded-lg border border-slate-200 text-sm font-semibold focus:outline-hidden focus:border-brand-blue"
-                    required
-                  />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1.5">Dojang / Cabang Latihan</label>
+                    <input
+                      type="text"
+                      value={profileDojang}
+                      onChange={e => setProfileDojang(e.target.value)}
+                      className="w-full px-4 py-2 rounded-lg border border-slate-200 text-sm font-semibold focus:outline-hidden focus:border-brand-blue"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1.5">Sabuk Terakhir</label>
+                    <select
+                      value={profileBelt}
+                      onChange={e => setProfileBelt(e.target.value)}
+                      className="w-full px-4 py-2 rounded-lg border border-slate-200 text-sm font-bold bg-white focus:outline-hidden focus:border-brand-blue cursor-pointer"
+                    >
+                      <option value="Sabuk Putih">⬜ Sabuk Putih</option>
+                      <option value="Sabuk Kuning">🟨 Sabuk Kuning</option>
+                      <option value="Sabuk Hijau">🟩 Sabuk Hijau</option>
+                      <option value="Sabuk Biru">🟦 Sabuk Biru</option>
+                      <option value="Sabuk Merah">🟥 Sabuk Merah</option>
+                      <option value="Sabuk Hitam">⬛ Sabuk Hitam</option>
+                    </select>
+                  </div>
                 </div>
 
                 <button
