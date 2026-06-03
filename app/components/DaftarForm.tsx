@@ -104,7 +104,7 @@ export default function DaftarForm({
         phone: phone,
         gender: gender,
         age: Number(age),
-        jenjang: jenjang,
+        jenjang: (jenjang === 'TK' || jenjang === 'Kuliah') ? 'Umum' : jenjang,
         dojang: dojang,
         belt: belt,
         status: 'Nonaktif',
