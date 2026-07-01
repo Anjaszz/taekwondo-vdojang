@@ -36,6 +36,7 @@ type TabType =
   | 'laporan-anggota'
   | 'laporan-aksesoris'
   | 'laporan-event'
+  | 'laporan-keuangan'
   | 'profile-setting'
   | 'harga-setting';
 
@@ -196,6 +197,28 @@ export default function DashboardAdmin({
     if (!ok) return;
     setLoading(true);
     try {
+      // Find transaction details to see if it's an accessory purchase
+      const tx = transactions.find(t => t.id === txId);
+      if (tx && tx.type === 'Aksesoris') {
+        const prefix = 'Pembelian Aksesoris: ';
+        if (tx.details.startsWith(prefix)) {
+          const rest = tx.details.slice(prefix.length);
+          const qtyIndex = rest.lastIndexOf(' (x');
+          if (qtyIndex !== -1) {
+            const productName = rest.substring(0, qtyIndex).trim();
+            const qtyStr = rest.substring(qtyIndex + 3);
+            const qty = parseInt(qtyStr) || 1;
+            
+            const prod = products.find(p => p.name === productName);
+            if (prod) {
+              const updatedStock = Math.max(0, prod.stock - qty);
+              const updatedProds = products.map(p => p.id === prod.id ? { ...p, stock: updatedStock } : p);
+              await db.saveProducts(updatedProds);
+            }
+          }
+        }
+      }
+
       await db.updateTransactionStatus(txId, 'Berhasil');
       await loadAdminData();
       toastSuccess('Pembayaran berhasil disetujui.');
@@ -584,6 +607,156 @@ export default function DashboardAdmin({
     setTimeout(() => { printWindow.print(); printWindow.close(); }, 500);
   };
 
+  const printKwitansi = (tx: Transaction) => {
+    const printWindow = window.open('', '_blank', 'width=600,height=700');
+    if (!printWindow) return;
+    printWindow.document.write(`
+      <html><head><title>Kwitansi Pembayaran #${tx.id}</title>
+      <style>
+        body { font-family: 'Courier New', Courier, monospace; margin: 40px; color: #333; line-height: 1.4; }
+        .receipt-container { border: 2px solid #333; padding: 20px; max-width: 500px; margin: 0 auto; }
+        .header { text-align: center; margin-bottom: 20px; border-bottom: 2px dashed #333; padding-bottom: 10px; }
+        .header h2 { margin: 0 0 5px 0; font-size: 20px; }
+        .header p { margin: 0; font-size: 12px; color: #666; }
+        .title { text-align: center; font-weight: bold; font-size: 16px; margin: 15px 0; text-transform: uppercase; }
+        .row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px; }
+        .row-label { font-weight: bold; }
+        .divider { border-top: 1px dashed #333; margin: 15px 0; }
+        .total-row { display: flex; justify-content: space-between; font-size: 16px; font-weight: bold; border-top: 2px solid #333; padding-top: 10px; margin-top: 15px; }
+        .footer { text-align: center; margin-top: 30px; font-size: 11px; border-top: 1px dashed #333; padding-top: 10px; }
+        .signature-section { display: flex; justify-content: space-between; margin-top: 40px; }
+        .signature-box { text-align: center; width: 150px; font-size: 12px; }
+        .signature-line { border-bottom: 1px solid #333; margin-top: 50px; }
+        @media print { body { margin: 20px; } }
+      </style>
+      </head><body>
+      <div class="receipt-container">
+        <div class="header">
+          <h2>V-DOJANG TAEKWONDO</h2>
+          <p>Waterfall Cikunir, Bekasi, Indonesia</p>
+          <p>WhatsApp: +62 812-1389-0279</p>
+        </div>
+        <div class="title">KWITANSI PEMBAYARAN</div>
+        <div class="row"><span class="row-label">No. Transaksi:</span><span>${tx.id}</span></div>
+        <div class="row"><span class="row-label">Tanggal:</span><span>${tx.date}</span></div>
+        <div class="row"><span class="row-label">Nama Anggota:</span><span>${tx.memberName}</span></div>
+        <div class="row"><span class="row-label">Tipe Transaksi:</span><span>${tx.type}</span></div>
+        <div class="divider"></div>
+        <div class="row"><span class="row-label">Deskripsi:</span><span>${tx.details}</span></div>
+        <div class="divider"></div>
+        <div class="row"><span class="row-label">Subtotal:</span><span>Rp ${tx.amount.toLocaleString('id-ID')}</span></div>
+        <div class="total-row"><span>TOTAL BAYAR:</span><span>Rp ${tx.amount.toLocaleString('id-ID')}</span></div>
+        <div class="row" style="margin-top:5px; font-size:11px; font-style:italic;"><span class="row-label">Status:</span><span style="color:green; font-weight:bold;">LUNAS / BERHASIL</span></div>
+        <div class="signature-section">
+          <div class="signature-box">
+            <p>Penerima,</p>
+            <div class="signature-line"></div>
+            <p style="margin-top:5px;">V-Dojang Admin</p>
+          </div>
+          <div class="signature-box">
+            <p>Penyetor,</p>
+            <div class="signature-line"></div>
+            <p style="margin-top:5px;">${tx.memberName}</p>
+          </div>
+        </div>
+        <div class="footer">
+          <p>Terima kasih atas pembayaran Anda.</p>
+          <p>Kwitansi ini adalah bukti pembayaran yang sah.</p>
+        </div>
+      </div>
+      </body></html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => { printWindow.print(); printWindow.close(); }, 500);
+  };
+
+  const exportLaporanKeuanganPDF = () => {
+    const printWindow = window.open('', '_blank', 'width=900,height=700');
+    if (!printWindow) return;
+    printWindow.document.write(`
+      <html><head><title>Laporan Keuangan Keseluruhan - V-Dojang</title>
+      <style>
+        body { font-family: Arial, sans-serif; margin: 30px; color: #1e293b; }
+        .header { border-bottom: 3px double #cbd5e1; padding-bottom: 12px; margin-bottom: 20px; text-align: center; }
+        .header h1 { margin: 0; font-size: 22px; font-weight: 900; }
+        .header p { margin: 4px 0 0 0; font-size: 12px; color: #64748b; }
+        .summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 30px; }
+        .summary-card { border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px; background: #f8fafc; }
+        .summary-title { font-size: 9px; font-weight: 800; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; }
+        .summary-value { font-size: 16px; font-weight: 900; color: #0f172a; margin-top: 4px; }
+        .section-title { font-size: 13px; font-weight: 900; color: #0f172a; text-transform: uppercase; margin-bottom: 10px; border-left: 3px solid #090681; padding-left: 8px; }
+        table { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 10px; }
+        th { background: #f1f5f9; color: #475569; font-weight: 800; padding: 8px 10px; text-align: left; border-bottom: 2px solid #e2e8f0; }
+        td { padding: 7px 10px; border-bottom: 1px solid #f1f5f9; color: #334155; }
+        tr:nth-child(even) td { background: #f8fafc; }
+        .total-row { font-weight: 900; background: #f1f5f9 !important; border-top: 2px solid #cbd5e1; }
+        @media print { body { margin: 15px; } }
+      </style>
+      </head><body>
+      <div class="header">
+        <h1>V-DOJANG TAEKWONDO CLUB</h1>
+        <p>LAPORAN KEUANGAN KESELURUHAN</p>
+        <p style="font-size: 10px; margin-top: 8px;">Dicetak pada: ${new Date().toLocaleString('id-ID')}</p>
+      </div>
+      
+      <div class="summary-grid">
+        <div class="summary-card">
+          <div class="summary-title">Pendapatan Pendaftaran</div>
+          <div class="summary-value">Rp ${totalRegRevenue.toLocaleString('id-ID')}</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-title">Pendapatan Aksesoris</div>
+          <div class="summary-value">Rp ${totalAccRevenue.toLocaleString('id-ID')}</div>
+        </div>
+        <div class="summary-card">
+          <div class="summary-title">Pendapatan Event / UKT</div>
+          <div class="summary-value">Rp ${totalEvtRevenue.toLocaleString('id-ID')}</div>
+        </div>
+        <div class="summary-card" style="background: #eff6ff; border-color: #bfdbfe;">
+          <div class="summary-title" style="color: #1d4ed8;">Total Keseluruhan</div>
+          <div class="summary-value" style="color: #1d4ed8;">Rp ${totalRevenue.toLocaleString('id-ID')}</div>
+        </div>
+      </div>
+
+      <div class="section-title">Rincian Transaksi Sukses</div>
+      <table>
+        <thead>
+          <tr>
+            <th>Tanggal</th>
+            <th>ID Transaksi</th>
+            <th>Nama Anggota</th>
+            <th>Tipe</th>
+            <th>Deskripsi</th>
+            <th style="text-align: right;">Jumlah</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${transactions
+            .filter(t => t.status === 'Berhasil')
+            .map(t => `
+              <tr>
+                <td>${t.date}</td>
+                <td>${t.id}</td>
+                <td>${t.memberName}</td>
+                <td>${t.type}</td>
+                <td>${t.details}</td>
+                <td style="text-align: right; font-weight: bold; color: #090681;">Rp ${t.amount.toLocaleString('id-ID')}</td>
+              </tr>
+            `).join('')}
+          <tr class="total-row">
+            <td colspan="5" style="text-align: right; padding-right: 15px;">TOTAL PENDAPATAN KESELURUHAN:</td>
+            <td style="text-align: right; color: #1d4ed8;">Rp ${totalRevenue.toLocaleString('id-ID')}</td>
+          </tr>
+        </tbody>
+      </table>
+      </body></html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => { printWindow.print(); printWindow.close(); }, 500);
+  };
+
   const renderPagination = (
     currentPage: number,
     totalItems: number,
@@ -651,6 +824,7 @@ export default function DashboardAdmin({
       case 'laporan-anggota': return 'Laporan Data Anggota';
       case 'laporan-aksesoris': return 'Laporan Penjualan Aksesoris';
       case 'laporan-event': return 'Laporan Event & UKT';
+      case 'laporan-keuangan': return 'Laporan Keuangan & Total Keseluruhan';
       case 'harga-setting': return 'Konfigurasi Harga & Rekening';
       case 'profile-setting': return 'Ubah Profil Admin';
       default: return 'Admin Portal';
@@ -679,7 +853,7 @@ export default function DashboardAdmin({
         return (
           <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200/50">
             <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-ping" style={{ animationDuration: '2s' }} />
-            Pending
+            On Process
           </span>
         );
     }
@@ -804,6 +978,7 @@ export default function DashboardAdmin({
               {renderSidebarItem('laporan-anggota', 'Anggota', <Users size={14} />, undefined, true)}
               {renderSidebarItem('laporan-aksesoris', 'Penjualan', <BarChart2 size={14} />, undefined, true)}
               {renderSidebarItem('laporan-event', 'Event / UKT', <Trophy size={14} />, undefined, true)}
+              {renderSidebarItem('laporan-keuangan', 'Keuangan/Total', <TrendingUp size={14} />, undefined, true)}
             </div>
           )}
 
@@ -1056,7 +1231,18 @@ export default function DashboardAdmin({
                                   </button>
                                 </div>
                               ) : (
-                                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Selesai</span>
+                                <div className="flex justify-end items-center gap-2">
+                                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Selesai</span>
+                                  {tx.status === 'Berhasil' && (
+                                    <button
+                                      type="button"
+                                      onClick={() => printKwitansi(tx)}
+                                      className="text-[9px] text-emerald-600 hover:text-emerald-700 font-extrabold flex items-center gap-1 border border-emerald-100 bg-emerald-50/30 px-2 py-0.5 rounded-lg hover:bg-emerald-50 transition"
+                                    >
+                                      🧾 Kwitansi
+                                    </button>
+                                  )}
+                                </div>
                               )}
                             </td>
                           </tr>
@@ -1706,6 +1892,137 @@ export default function DashboardAdmin({
                       </table>
                       {renderPagination(currentPageLaporanEvent, eventTx.length, setCurrentPageLaporanEvent)}
                     </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* TAB: Laporan Keuangan Keseluruhan */}
+            {activeTab === 'laporan-keuangan' && (
+              <div className="space-y-6 bg-white border border-slate-100 p-4 sm:p-6 rounded-2xl shadow-xs animate-fade-in font-sans">
+                {/* Export Buttons */}
+                <div className="flex items-center justify-between flex-wrap gap-3 pb-4 border-b border-slate-100">
+                  <div>
+                    <h3 className="text-sm font-black text-slate-800">Laporan Keuangan &amp; Total Keseluruhan</h3>
+                    <p className="text-[10px] text-slate-400 mt-0.5">Rekapitulasi total pendapatan dari seluruh aktivitas club</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => exportToCSV('laporan-keuangan-total', ['Tanggal', 'ID Transaksi', 'Nama Anggota', 'Tipe', 'Deskripsi', 'Nominal (Rp)'],
+                        transactions.filter(t => t.status === 'Berhasil').map(tx => [tx.date, tx.id, tx.memberName, tx.type, tx.details, tx.amount])
+                      )}
+                      className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-[10px] font-black uppercase tracking-wider transition"
+                    >
+                      <FileSpreadsheet size={13} />
+                      Export Excel
+                    </button>
+                    <button
+                      onClick={exportLaporanKeuanganPDF}
+                      className="inline-flex items-center gap-1.5 px-3 py-2 bg-brand-red/8 hover:bg-brand-red/15 text-brand-red border border-brand-red/15 rounded-xl text-[10px] font-black uppercase tracking-wider transition"
+                    >
+                      <Printer size={13} />
+                      Cetak Laporan PDF
+                    </button>
+                  </div>
+                </div>
+
+                {/* Stats Summary Card Row */}
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-6">
+                  <div className="bg-slate-50 border border-slate-100 rounded-xl p-5">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Pendapatan Pendaftaran</p>
+                    <p className="text-xl font-black text-slate-850 mt-1">Rp {totalRegRevenue.toLocaleString('id-ID')}</p>
+                  </div>
+                  <div className="bg-slate-50 border border-slate-100 rounded-xl p-5">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Pendapatan Aksesoris</p>
+                    <p className="text-xl font-black text-slate-850 mt-1">Rp {totalAccRevenue.toLocaleString('id-ID')}</p>
+                  </div>
+                  <div className="bg-slate-50 border border-slate-100 rounded-xl p-5">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Pendapatan Event / UKT</p>
+                    <p className="text-xl font-black text-slate-850 mt-1">Rp {totalEvtRevenue.toLocaleString('id-ID')}</p>
+                  </div>
+                  <div className="bg-blue-50 border border-blue-100 rounded-xl p-5 shadow-sm shadow-brand-blue/5">
+                    <p className="text-[10px] font-black text-brand-blue uppercase tracking-widest">Total Keseluruhan</p>
+                    <p className="text-2xl font-black text-brand-blue mt-1">Rp {totalRevenue.toLocaleString('id-ID')}</p>
+                  </div>
+                </div>
+
+                {/* Breakdown bar */}
+                <div className="bg-slate-50 rounded-2xl p-5 border border-slate-100">
+                  <h4 className="font-black text-[10px] text-slate-400 uppercase tracking-widest mb-3">Persentase Breakdown Pendapatan</h4>
+                  {(() => {
+                    const regPct = totalRevenue > 0 ? (totalRegRevenue / totalRevenue) * 100 : 0;
+                    const accPct = totalRevenue > 0 ? (totalAccRevenue / totalRevenue) * 100 : 0;
+                    const evtPct = totalRevenue > 0 ? (totalEvtRevenue / totalRevenue) * 100 : 0;
+                    return (
+                      <div className="space-y-4">
+                        <div className="w-full h-4 bg-slate-200 rounded-full overflow-hidden flex">
+                          <div style={{ width: `${regPct}%` }} className="bg-brand-blue" title={`Pendaftaran: ${regPct.toFixed(1)}%`}></div>
+                          <div style={{ width: `${accPct}%` }} className="bg-emerald-500" title={`Aksesoris: ${accPct.toFixed(1)}%`}></div>
+                          <div style={{ width: `${evtPct}%` }} className="bg-brand-red" title={`Event: ${evtPct.toFixed(1)}%`}></div>
+                        </div>
+                        <div className="flex flex-wrap gap-6 text-xs font-bold text-slate-600 justify-center">
+                          <div className="flex items-center gap-2">
+                            <span className="w-3 h-3 bg-brand-blue rounded"></span>
+                            <span>Pendaftaran ({regPct.toFixed(1)}%)</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="w-3 h-3 bg-emerald-500 rounded"></span>
+                            <span>Aksesoris ({accPct.toFixed(1)}%)</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="w-3 h-3 bg-brand-red rounded"></span>
+                            <span>Event / UKT ({evtPct.toFixed(1)}%)</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+
+                {/* Full Transactions Log */}
+                <div className="space-y-3 pt-2">
+                  <h4 className="font-black text-slate-800 text-xs uppercase tracking-wider">Tabel Rincian Seluruh Transaksi Sukses</h4>
+                  <div className="border border-slate-100 rounded-xl overflow-x-auto bg-white shadow-xs">
+                    <table className="w-full text-left text-xs border-collapse min-w-[800px]">
+                      <thead>
+                        <tr className="bg-slate-50 text-slate-500 font-extrabold border-b border-slate-100">
+                          <th className="p-3">Tanggal</th>
+                          <th className="p-3">ID Transaksi</th>
+                          <th className="p-3">Nama Anggota</th>
+                          <th className="p-3">Tipe</th>
+                          <th className="p-3">Deskripsi</th>
+                          <th className="p-3 text-right">Jumlah</th>
+                          <th className="p-3 text-center">Aksi</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {transactions
+                          .filter(t => t.status === 'Berhasil')
+                          .map(tx => (
+                            <tr key={tx.id} className="border-b border-slate-100 hover:bg-slate-50/20 transition font-semibold text-slate-650">
+                              <td className="p-3">{tx.date}</td>
+                              <td className="p-3 font-mono text-[10px]">{tx.id}</td>
+                              <td className="p-3 font-bold text-slate-800">{tx.memberName}</td>
+                              <td className="p-3">
+                                <span className="bg-slate-100 text-slate-650 text-[9px] font-black uppercase px-2 py-0.5 rounded">
+                                  {tx.type}
+                                </span>
+                              </td>
+                              <td className="p-3">{tx.details}</td>
+                              <td className="p-3 text-brand-blue font-bold text-right">Rp {tx.amount.toLocaleString('id-ID')}</td>
+                              <td className="p-3 text-center">
+                                <button
+                                  type="button"
+                                  onClick={() => printKwitansi(tx)}
+                                  className="text-[9px] text-emerald-600 hover:text-emerald-700 font-extrabold flex items-center gap-1 border border-emerald-100 bg-emerald-50/30 px-2 py-0.5 rounded-lg hover:bg-emerald-50 transition mx-auto"
+                                >
+                                  🧾 Kwitansi
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
               </div>

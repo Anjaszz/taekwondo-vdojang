@@ -50,7 +50,11 @@ export default function LandingPage({
     id: string;
     name: string;
     price: number;
+    categoryId?: string;
+    stock?: number;
   } | null>(null);
+  const [checkoutQuantity, setCheckoutQuantity] = useState<number>(1);
+  const [checkoutSize, setCheckoutSize] = useState<string>('');
   const [checkoutFile, setCheckoutFile] = useState<File | null>(null);
   const [checkoutPreview, setCheckoutPreview] = useState<string>('');
   const [loading, setLoading] = useState(false);
@@ -75,7 +79,11 @@ export default function LandingPage({
       id: item.id,
       name: item.name,
       price: item.price,
+      categoryId: (item as Product).categoryId || undefined,
+      stock: (item as Product).stock !== undefined ? (item as Product).stock : undefined,
     });
+    setCheckoutQuantity(1);
+    setCheckoutSize('');
     setCheckoutFile(null);
     setCheckoutPreview('');
   };
@@ -168,13 +176,17 @@ export default function LandingPage({
       const uploadData = checkoutFile || checkoutPreview;
       const imageUrl = await db.uploadImage(uploadData);
 
+      const finalAmount = checkoutItem.price * (checkoutItem.type === 'Aksesoris' ? checkoutQuantity : 1);
+      const sizeSuffix = checkoutSize ? `, Ukuran: ${checkoutSize}` : '';
+      const qtySuffix = checkoutItem.type === 'Aksesoris' ? ` (x${checkoutQuantity}${sizeSuffix})` : '';
+
       const newTx: Transaction = {
         id: 'tx-' + Date.now(),
         memberId: currentUser.id,
         memberName: currentUser.name,
         type: checkoutItem.type,
-        details: `${checkoutItem.type === 'UKT' ? 'Pendaftaran Event' : 'Pembelian Aksesoris'}: ${checkoutItem.name}`,
-        amount: checkoutItem.price,
+        details: `${checkoutItem.type === 'UKT' ? 'Pendaftaran Event' : 'Pembelian Aksesoris'}: ${checkoutItem.name}${qtySuffix}`,
+        amount: finalAmount,
         proofImage: imageUrl,
         status: 'Pending',
         date: new Date().toISOString().split('T')[0],
@@ -692,7 +704,7 @@ export default function LandingPage({
                 <div>
                   <p className="text-[9px] font-black text-slate-400 uppercase">Transfer Nominal</p>
                   <p className="text-xl font-black text-brand-blue">
-                    Rp {checkoutItem.price.toLocaleString('id-ID')}
+                    Rp {(checkoutItem.price * (checkoutItem.type === 'Aksesoris' ? checkoutQuantity : 1)).toLocaleString('id-ID')}
                   </p>
                 </div>
                 <div className="border-t border-slate-200/50 pt-2.5 text-[11px] font-semibold text-slate-500 space-y-0.5">
@@ -713,6 +725,57 @@ export default function LandingPage({
               </div>
 
               <form onSubmit={handleCheckoutSubmit} className="space-y-4">
+                {checkoutItem.type === 'Aksesoris' && (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1">Jumlah Pembelian</label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={checkoutItem.stock || 99}
+                        value={checkoutQuantity}
+                        onChange={e => setCheckoutQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+                        className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden"
+                        required
+                      />
+                    </div>
+
+                    {checkoutItem.categoryId === 'cat-1' && (
+                      <div>
+                        <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1">Ukuran Baju</label>
+                        <select
+                          value={checkoutSize}
+                          onChange={e => setCheckoutSize(e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white cursor-pointer"
+                          required
+                        >
+                          <option value="">-- Pilih Ukuran --</option>
+                          {Array.from({ length: 11 }, (_, i) => 100 + i * 10).map(sz => (
+                            <option key={sz} value={String(sz)}>{sz}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
+                    {checkoutItem.categoryId === 'cat-2' && (
+                      <div>
+                        <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1">Ukuran Body Guard</label>
+                        <select
+                          value={checkoutSize}
+                          onChange={e => setCheckoutSize(e.target.value)}
+                          className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white cursor-pointer"
+                          required
+                        >
+                          <option value="">-- Pilih Ukuran --</option>
+                          {['0', '1', '2', '3', '4', '5'].map(sz => (
+                            <option key={sz} value={sz}>{sz}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 <div className="space-y-1">
                   <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider">
                     Upload File Bukti Transfer

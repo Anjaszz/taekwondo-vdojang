@@ -4,7 +4,6 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useDashboard } from './context';
 import DashboardAdmin from '../components/DashboardAdmin';
-import DashboardKasir from '../components/DashboardKasir';
 import DashboardAnggota from '../components/DashboardAnggota';
 import { db, User, Transaction, SystemSettings } from '../lib/db';
 import { useToast } from '../components/ui/ToastProvider';
@@ -335,14 +334,6 @@ export default function DashboardTabContent({ activeTab }: DashboardTabContentPr
         <DashboardAdmin
           adminUser={currentUser}
           onUpdateAdminProfile={onUpdateProfile}
-          onLogout={onLogout}
-          activeTabProp={activeTab}
-          setActiveTabProp={(newTab) => router.push('/dashboard/' + newTab)}
-        />
-      )}
-      {currentUser.role === 'kasir' && (
-        <DashboardKasir 
-          kasirUser={currentUser} 
           onLogout={onLogout}
           activeTabProp={activeTab}
           setActiveTabProp={(newTab) => router.push('/dashboard/' + newTab)}

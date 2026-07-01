@@ -10,7 +10,7 @@ export default function DashboardRootPage() {
 
   useEffect(() => {
     if (currentUser) {
-      if (currentUser.role === 'admin' || currentUser.role === 'kasir') {
+      if (currentUser.role === 'admin') {
         router.replace('/dashboard/ringkasan');
       } else if (currentUser.role === 'anggota') {
         router.replace('/dashboard/profil');

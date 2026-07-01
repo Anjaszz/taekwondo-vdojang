@@ -74,12 +74,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   if (!currentUser) return null;
 
   const isMember = currentUser.role === 'anggota';
-  const isAdminOrKasir = currentUser.role === 'admin' || currentUser.role === 'kasir';
+  const isAdmin = currentUser.role === 'admin';
 
   return (
     <DashboardContext.Provider value={{ currentUser, onUpdateProfile: handleUpdateProfile, onLogout: handleLogout }}>
-      <div className={`flex flex-col bg-[#fafafc] ${isAdminOrKasir ? 'h-screen overflow-hidden' : 'min-h-screen'}`}>
-        {/* Only render landing page Navbar for members. Admin/Kasir have full-screen layouts. */}
+      <div className={`flex flex-col bg-[#fafafc] ${isAdmin ? 'h-screen overflow-hidden' : 'min-h-screen'}`}>
+        {/* Only render landing page Navbar for members. Admin has full-screen layout. */}
         {isMember && (
           <Navbar
             currentUser={currentUser}

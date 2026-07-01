@@ -23,8 +23,8 @@ export default function Navbar({ currentUser, onLogout, isSupabaseConfigured }: 
     { href: '/#shop-section', label: 'Toko Peralatan' },
   ];
 
-  const roleLabel = currentUser?.role === 'admin' ? 'Admin' : currentUser?.role === 'kasir' ? 'Kasir' : 'Anggota';
-  const roleColor = currentUser?.role === 'admin' ? 'bg-brand-blue/10 text-brand-blue' : currentUser?.role === 'kasir' ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700';
+  const roleLabel = currentUser?.role === 'admin' ? 'Admin' : 'Anggota';
+  const roleColor = currentUser?.role === 'admin' ? 'bg-brand-blue/10 text-brand-blue' : 'bg-emerald-100 text-emerald-700';
 
   return (
     <div className="w-full flex flex-col z-50 sticky top-0">

@@ -62,7 +62,7 @@ export default function DaftarPage() {
               <div>
                 <h2 className="text-2xl font-black text-slate-900">Registrasi Berhasil!</h2>
                 <p className="text-slate-500 text-sm mt-2 max-w-sm mx-auto">
-                  Pendaftaran dan upload bukti bayar pendaftaran Anda telah berhasil dikirim. Akun Anda saat ini sedang dalam proses review aktivasi oleh admin/kasir.
+                  Pendaftaran dan upload bukti bayar pendaftaran Anda telah berhasil dikirim. Akun Anda saat ini sedang dalam proses review aktivasi oleh admin.
                 </p>
               </div>
               
@@ -70,7 +70,7 @@ export default function DaftarPage() {
                 <p>📌 <strong>Nama:</strong> {registeredUser.name}</p>
                 <p>📧 <strong>Email Login:</strong> {registeredUser.email}</p>
                 <p>🥋 <strong>Status Latihan:</strong> {registeredUser.dojang}</p>
-                <p>⌛ <strong>Status Akun:</strong> <span className="text-brand-red font-bold">Pending Aktivasi</span></p>
+                <p>⌛ <strong>Status Akun:</strong> <span className="text-brand-red font-bold">On Process</span></p>
               </div>
 
               <div className="flex gap-4 w-full">

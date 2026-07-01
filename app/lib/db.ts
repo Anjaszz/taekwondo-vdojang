@@ -5,7 +5,7 @@ export interface User {
   id: string;
   email: string;
   name: string;
-  role: 'admin' | 'kasir' | 'anggota';
+  role: 'admin' | 'anggota';
   phone?: string;
   gender?: 'Laki-laki' | 'Perempuan';
   age?: number;
