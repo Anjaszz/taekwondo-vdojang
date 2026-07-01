@@ -6,7 +6,7 @@ import { useToast } from './ui/ToastProvider';
 import {
   Trophy, Swords, Shield, MapPin, Calendar, Users,
   ShoppingBag, Mail, Phone, ChevronRight, ArrowRight,
-  Ticket, Star, Package, ExternalLink, Loader2, X, CreditCard, UploadCloud, Copy, Check,
+  Ticket, Star, Package, ExternalLink, Loader2, X, CreditCard, UploadCloud, Copy, Check, Plus, Minus,
 } from 'lucide-react';
 
 interface LandingPageProps {
@@ -728,16 +728,37 @@ export default function LandingPage({
                 {checkoutItem.type === 'Aksesoris' && (
                   <div className="space-y-3">
                     <div>
-                      <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1">Jumlah Pembelian</label>
-                      <input
-                        type="number"
-                        min={1}
-                        max={checkoutItem.stock || 99}
-                        value={checkoutQuantity}
-                        onChange={e => setCheckoutQuantity(Math.max(1, parseInt(e.target.value) || 1))}
-                        className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden"
-                        required
-                      />
+                      <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1.5">Jumlah Pembelian</label>
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          disabled={checkoutQuantity <= 1}
+                          onClick={() => setCheckoutQuantity(prev => Math.max(1, prev - 1))}
+                          className="w-8 h-8 flex items-center justify-center border border-slate-200 rounded-lg hover:bg-slate-50 text-slate-600 font-bold transition disabled:opacity-40 bg-white"
+                        >
+                          <Minus size={12} />
+                        </button>
+                        <input
+                          type="number"
+                          min={1}
+                          max={checkoutItem.stock || 99}
+                          value={checkoutQuantity}
+                          onChange={e => {
+                            const val = Math.max(1, parseInt(e.target.value) || 1);
+                            const maxVal = checkoutItem.stock || 99;
+                            setCheckoutQuantity(Math.min(maxVal, val));
+                          }}
+                          className="w-12 h-8 text-center border border-slate-200 rounded-lg text-xs font-bold focus:outline-hidden [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none bg-white"
+                        />
+                        <button
+                          type="button"
+                          disabled={checkoutQuantity >= (checkoutItem.stock || 99)}
+                          onClick={() => setCheckoutQuantity(prev => Math.min(checkoutItem.stock || 99, prev + 1))}
+                          className="w-8 h-8 flex items-center justify-center border border-slate-200 rounded-lg hover:bg-slate-50 text-slate-600 font-bold transition disabled:opacity-40 bg-white"
+                        >
+                          <Plus size={12} />
+                        </button>
+                      </div>
                     </div>
 
                     {checkoutItem.categoryId === 'cat-1' && (

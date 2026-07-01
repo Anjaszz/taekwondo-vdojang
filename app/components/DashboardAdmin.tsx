@@ -561,9 +561,10 @@ export default function DashboardAdmin({
   const exportToCSV = (filename: string, headers: string[], rows: (string | number)[][]) => {
     const BOM = '\uFEFF'; // UTF-8 BOM for Excel compatibility
     const csvContent = [
-      headers.join(','),
+      'sep=;',
+      headers.join(';'),
       ...rows.map(row =>
-        row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')
+        row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(';')
       ),
     ].join('\n');
     const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
