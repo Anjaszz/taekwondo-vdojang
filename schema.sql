@@ -43,7 +43,8 @@ CREATE TABLE IF NOT EXISTS events (
   date TEXT NOT NULL,
   location TEXT NOT NULL,
   price NUMERIC NOT NULL,
-  category TEXT NOT NULL
+  category TEXT NOT NULL,
+  status TEXT DEFAULT 'Aktif' CHECK (status IN ('Aktif', 'Nonaktif'))
 );
 ALTER TABLE events DISABLE ROW LEVEL SECURITY;
 

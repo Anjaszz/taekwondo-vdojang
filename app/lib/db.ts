@@ -38,6 +38,7 @@ export interface Event {
   location: string;
   price: number;
   category: string;
+  status?: 'Aktif' | 'Nonaktif';
 }
 
 export interface Transaction {
@@ -209,6 +210,7 @@ export const db = {
       return (data || []).map((e: any) => ({
         ...e,
         price: Number(e.price),
+        status: e.status || 'Aktif',
       }));
     } catch (err) {
       console.error('Error fetching events from Supabase:', err);

@@ -57,6 +57,7 @@ export default function LandingPage({
   const [checkoutSize, setCheckoutSize] = useState<string>('');
   const [checkoutFile, setCheckoutFile] = useState<File | null>(null);
   const [checkoutPreview, setCheckoutPreview] = useState<string>('');
+  const [checkoutBelt, setCheckoutBelt] = useState<string>('');
   const [loading, setLoading] = useState(false);
 
   // Fetch bank settings on mount
@@ -86,6 +87,7 @@ export default function LandingPage({
     setCheckoutSize('');
     setCheckoutFile(null);
     setCheckoutPreview('');
+    setCheckoutBelt(currentUser?.belt || 'Sabuk Putih');
   };
 
   // Detect checkout query parameters on Landing Page and open modal automatically
@@ -177,6 +179,7 @@ export default function LandingPage({
       const imageUrl = await db.uploadImage(uploadData);
 
       const finalAmount = checkoutItem.price * (checkoutItem.type === 'Aksesoris' ? checkoutQuantity : 1);
+      const uktBeltSuffix = checkoutItem.type === 'UKT' ? ` (Sabuk Terakhir: ${checkoutBelt})` : '';
       const sizeSuffix = checkoutSize ? `, Ukuran: ${checkoutSize}` : '';
       const qtySuffix = checkoutItem.type === 'Aksesoris' ? ` (x${checkoutQuantity}${sizeSuffix})` : '';
 
@@ -185,7 +188,7 @@ export default function LandingPage({
         memberId: currentUser.id,
         memberName: currentUser.name,
         type: checkoutItem.type,
-        details: `${checkoutItem.type === 'UKT' ? 'Pendaftaran Event' : 'Pembelian Aksesoris'}: ${checkoutItem.name}${qtySuffix}`,
+        details: `${checkoutItem.type === 'UKT' ? 'Pendaftaran Event' : 'Pembelian Aksesoris'}: ${checkoutItem.name}${qtySuffix}${uktBeltSuffix}`,
         amount: finalAmount,
         proofImage: imageUrl,
         status: 'Pending',
@@ -552,13 +555,38 @@ export default function LandingPage({
                       </div>
                     </div>
 
-                    <button
-                      onClick={() => handleRegisterEvent(evt.id)}
-                      className="w-full py-2.5 border border-brand-blue/30 text-brand-blue font-bold rounded-xl text-xs hover:bg-brand-blue hover:text-white hover:border-brand-blue transition duration-200 uppercase tracking-wider flex items-center justify-center gap-1.5"
-                    >
-                      {currentUser ? 'Daftar Event' : 'Masuk & Daftar'}
-                      <ExternalLink size={12} />
-                    </button>
+                    {(() => {
+                      const d = new Date();
+                      const year = d.getFullYear();
+                      const month = String(d.getMonth() + 1).padStart(2, '0');
+                      const day = String(d.getDate()).padStart(2, '0');
+                      const todayStr = `${year}-${month}-${day}`;
+                      
+                      const isEventExpired = evt.date ? evt.date < todayStr : false;
+                      const isEventInactive = evt.status === 'Nonaktif';
+                      const isClosed = isEventExpired || isEventInactive;
+
+                      if (isClosed) {
+                        return (
+                          <button
+                            disabled
+                            className="w-full py-2.5 bg-slate-100 border border-slate-200 text-slate-400 font-bold rounded-xl text-xs uppercase tracking-wider flex items-center justify-center gap-1.5 cursor-not-allowed"
+                          >
+                            {isEventExpired ? 'Event Berakhir' : 'Tidak Aktif'}
+                          </button>
+                        );
+                      }
+
+                      return (
+                        <button
+                          onClick={() => handleRegisterEvent(evt.id)}
+                          className="w-full py-2.5 border border-brand-blue/30 text-brand-blue font-bold rounded-xl text-xs hover:bg-brand-blue hover:text-white hover:border-brand-blue transition duration-200 uppercase tracking-wider flex items-center justify-center gap-1.5"
+                        >
+                          {currentUser ? 'Daftar Event' : 'Masuk & Daftar'}
+                          <ExternalLink size={12} />
+                        </button>
+                      );
+                    })()}
                   </div>
                 </div>
               ))
@@ -794,6 +822,20 @@ export default function LandingPage({
                         </select>
                       </div>
                     )}
+                  </div>
+                )}
+
+                {checkoutItem.type === 'UKT' && (
+                  <div>
+                    <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1">Sabuk Terakhir</label>
+                    <input
+                      type="text"
+                      value={checkoutBelt}
+                      onChange={e => setCheckoutBelt(e.target.value)}
+                      placeholder="Contoh: Sabuk Hijau"
+                      className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white"
+                      required
+                    />
                   </div>
                 )}
 

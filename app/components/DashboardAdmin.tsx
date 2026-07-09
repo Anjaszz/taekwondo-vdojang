@@ -8,7 +8,7 @@ import {
   Menu, Eye, EyeOff, Save, Plus, Edit2, Trash2, X,
   TrendingUp, ShoppingBag, AlertCircle, CheckCircle2, Clock,
   Upload, ImageIcon, Calendar, MapPin, Mail, Phone, Award, Copy,
-  ExternalLink, Loader2, FileSpreadsheet, Printer,
+  ExternalLink, Loader2, FileSpreadsheet, Printer, UserX, UserCheck,
 } from 'lucide-react';
 
 interface DashboardAdminProps {
@@ -79,6 +79,23 @@ export default function DashboardAdmin({
   const [currentPageLaporanEvent, setCurrentPageLaporanEvent] = useState(1);
   const [currentPageLaporanReg, setCurrentPageLaporanReg] = useState(1);
 
+  // Filter states
+  const [filterMemberName, setFilterMemberName] = useState('');
+  const [filterMemberBelt, setFilterMemberBelt] = useState('Semua');
+  const [filterMemberStatus, setFilterMemberStatus] = useState('Semua');
+
+  const [filterAccMonth, setFilterAccMonth] = useState('Semua');
+  const [filterAccYear, setFilterAccYear] = useState('Semua');
+  const [filterAccProduct, setFilterAccProduct] = useState('Semua');
+
+  const [filterEvtMonth, setFilterEvtMonth] = useState('Semua');
+  const [filterEvtYear, setFilterEvtYear] = useState('Semua');
+  const [filterEvtName, setFilterEvtName] = useState('Semua');
+  const [filterEvtBelt, setFilterEvtBelt] = useState('Semua');
+
+  const [filterFinMonth, setFilterFinMonth] = useState('Semua');
+  const [filterFinYear, setFilterFinYear] = useState('Semua');
+
   // Loaded DB data
   const [users, setUsers] = useState<User[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -115,6 +132,7 @@ export default function DashboardAdmin({
   const [evtLoc, setEvtLoc] = useState('');
   const [evtPrice, setEvtPrice] = useState<number | string>('');
   const [evtCat, setEvtCat] = useState('');
+  const [evtStatus, setEvtStatus] = useState<'Aktif' | 'Nonaktif'>('Aktif');
 
   // Profile Form States
   const [adminName, setAdminName] = useState(adminUser.name);
@@ -414,6 +432,7 @@ export default function DashboardAdmin({
             location: evtLoc || '',
             price: Number(evtPrice.toString().replace(/\D/g, '')),
             category: evtCat,
+            status: evtStatus,
           };
         }
       } else {
@@ -424,6 +443,7 @@ export default function DashboardAdmin({
           location: evtLoc || '',
           price: Number(evtPrice.toString().replace(/\D/g, '')),
           category: evtCat,
+          status: evtStatus,
         });
       }
 
@@ -435,6 +455,7 @@ export default function DashboardAdmin({
       setEvtLoc('');
       setEvtPrice('');
       setEvtCat('Semua Tingkatan');
+      setEvtStatus('Aktif');
       await loadAdminData();
       toastSuccess('Event berhasil disimpan.');
     } catch (err) {
@@ -455,6 +476,31 @@ export default function DashboardAdmin({
     } catch (err) {
       console.error(err);
       toastError('Gagal menghapus event.');
+    }
+  };
+
+  const handleToggleMemberStatus = async (userToToggle: User) => {
+    const newStatus: 'Aktif' | 'Nonaktif' = userToToggle.status === 'Aktif' ? 'Nonaktif' : 'Aktif';
+    const ok = await confirmModal(
+      'Ubah Status Anggota',
+      `Apakah Anda yakin ingin mengubah status anggota ${userToToggle.name} menjadi ${newStatus}?`,
+      { confirmLabel: 'Ubah Status', variant: 'default' }
+    );
+    if (!ok) return;
+    setLoading(true);
+    try {
+      const updatedUser: User = { ...userToToggle, status: newStatus };
+      await db.updateUser(updatedUser);
+      await loadAdminData();
+      if (viewingMemberDetails && viewingMemberDetails.id === userToToggle.id) {
+        setViewingMemberDetails(updatedUser);
+      }
+      toastSuccess(`Status anggota berhasil diubah menjadi ${newStatus}.`);
+    } catch (err) {
+      console.error(err);
+      toastError('Gagal mengubah status anggota.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -556,6 +602,54 @@ export default function DashboardAdmin({
     acc[evtNameClean].count += 1;
     return acc;
   }, {});
+
+  // Computed Filtered Lists
+  const filteredUsersList = users
+    .filter(u => u.role === 'anggota')
+    .filter(u => {
+      if (filterMemberName && !u.name.toLowerCase().includes(filterMemberName.toLowerCase())) return false;
+      if (filterMemberBelt !== 'Semua' && u.belt !== filterMemberBelt) return false;
+      if (filterMemberStatus !== 'Semua' && u.status !== filterMemberStatus) return false;
+      return true;
+    });
+
+  const filteredAccessoryTx = accessoryTx.filter(tx => {
+    if (filterAccMonth !== 'Semua' && tx.date.split('-')[1] !== filterAccMonth) return false;
+    if (filterAccYear !== 'Semua' && tx.date.split('-')[0] !== filterAccYear) return false;
+    if (filterAccProduct !== 'Semua' && !tx.details.toLowerCase().includes(filterAccProduct.toLowerCase())) return false;
+    return true;
+  });
+  const filteredTotalAccRevenue = filteredAccessoryTx.reduce((sum, t) => sum + t.amount, 0);
+
+  const filteredEventTx = eventTx.filter(tx => {
+    if (filterEvtMonth !== 'Semua' && tx.date.split('-')[1] !== filterEvtMonth) return false;
+    if (filterEvtYear !== 'Semua' && tx.date.split('-')[0] !== filterEvtYear) return false;
+    if (filterEvtName !== 'Semua' && !tx.details.toLowerCase().includes(filterEvtName.toLowerCase())) return false;
+    if (filterEvtBelt !== 'Semua') {
+      const userOfTx = users.find(u => u.id === tx.memberId);
+      if (!userOfTx) return false;
+      const beltLower = (userOfTx.belt || '').toLowerCase();
+      if (filterEvtBelt === 'Poom') {
+        if (!beltLower.includes('poom') && !beltLower.includes('dan')) return false;
+      } else {
+        if (userOfTx.belt !== filterEvtBelt) return false;
+      }
+    }
+    return true;
+  });
+  const filteredTotalEvtRevenue = filteredEventTx.reduce((sum, t) => sum + t.amount, 0);
+
+  const filteredFinTx = transactions
+    .filter(t => t.status === 'Berhasil')
+    .filter(tx => {
+      if (filterFinMonth !== 'Semua' && tx.date.split('-')[1] !== filterFinMonth) return false;
+      if (filterFinYear !== 'Semua' && tx.date.split('-')[0] !== filterFinYear) return false;
+      return true;
+    });
+  const filteredRegRevenue = filteredFinTx.filter(t => t.type === 'Pendaftaran').reduce((sum, t) => sum + t.amount, 0);
+  const filteredAccRevenueFin = filteredFinTx.filter(t => t.type === 'Aksesoris').reduce((sum, t) => sum + t.amount, 0);
+  const filteredEvtRevenueFin = filteredFinTx.filter(t => t.type === 'UKT').reduce((sum, t) => sum + t.amount, 0);
+  const filteredTotalRevenue = filteredFinTx.reduce((sum, t) => sum + t.amount, 0);
 
   // ── Export Helpers ────────────────────────────────────────────────────
   const exportToCSV = (filename: string, headers: string[], rows: (string | number)[][]) => {
@@ -1542,12 +1636,12 @@ export default function DashboardAdmin({
                 <div className="flex items-center justify-between flex-wrap gap-3 pb-4 border-b border-slate-100">
                   <div>
                     <h3 className="text-sm font-black text-slate-800">Laporan Data Anggota</h3>
-                    <p className="text-[10px] text-slate-400 mt-0.5">{users.filter(u => u.role === 'anggota').length} anggota terdaftar</p>
+                    <p className="text-[10px] text-slate-400 mt-0.5">{filteredUsersList.length} anggota ditemukan ({users.filter(u => u.role === 'anggota').length} total)</p>
                   </div>
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => exportToCSV('laporan-anggota', ['Nama Lengkap', 'Dojang', 'Kontak', 'Gender', 'Jenjang', 'Sabuk', 'Status'],
-                        users.filter(u => u.role === 'anggota').map(u => [u.name, u.dojang || '-', u.phone || '-', u.gender || '-', u.jenjang || '-', u.belt || '-', u.status || '-'])
+                        filteredUsersList.map(u => [u.name, u.dojang || '-', u.phone || '-', u.gender || '-', u.jenjang || '-', u.belt || '-', u.status || '-'])
                       )}
                       className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-[10px] font-black uppercase tracking-wider transition"
                     >
@@ -1563,6 +1657,55 @@ export default function DashboardAdmin({
                     </button>
                   </div>
                 </div>
+
+                {/* Filter Bar */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-50 p-4 rounded-xl border border-slate-100">
+                  <div>
+                    <label className="block text-[9px] font-bold text-slate-500 mb-1">Cari Nama Anggota</label>
+                    <input
+                      type="text"
+                      value={filterMemberName}
+                      onChange={e => { setFilterMemberName(e.target.value); setCurrentPageLaporanAnggota(1); }}
+                      placeholder="Ketik nama anggota..."
+                      className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white shadow-xs"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[9px] font-bold text-slate-500 mb-1">Filter Sabuk</label>
+                    <select
+                      value={filterMemberBelt}
+                      onChange={e => { setFilterMemberBelt(e.target.value); setCurrentPageLaporanAnggota(1); }}
+                      className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white shadow-xs"
+                    >
+                      <option value="Semua">Semua Sabuk</option>
+                      <option value="Sabuk Putih">Sabuk Putih</option>
+                      <option value="Sabuk Kuning">Sabuk Kuning</option>
+                      <option value="Sabuk Hijau">Sabuk Hijau</option>
+                      <option value="Sabuk Biru">Sabuk Biru</option>
+                      <option value="Sabuk Merah">Sabuk Merah</option>
+                      <option value="Sabuk Hitam">Sabuk Hitam</option>
+                      <option value="Poom 1">Poom 1</option>
+                      <option value="Poom 2">Poom 2</option>
+                      <option value="Poom 3">Poom 3</option>
+                      <option value="Dan 1">Dan 1</option>
+                      <option value="Dan 2">Dan 2</option>
+                      <option value="Dan 3">Dan 3</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[9px] font-bold text-slate-500 mb-1">Filter Status</label>
+                    <select
+                      value={filterMemberStatus}
+                      onChange={e => { setFilterMemberStatus(e.target.value); setCurrentPageLaporanAnggota(1); }}
+                      className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white shadow-xs"
+                    >
+                      <option value="Semua">Semua Status</option>
+                      <option value="Aktif">Aktif</option>
+                      <option value="Nonaktif">Nonaktif</option>
+                    </select>
+                  </div>
+                </div>
+
                 {/* Stats Summary Card Row */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
                   <div className="bg-slate-50 border border-slate-100 rounded-xl p-5">
@@ -1623,8 +1766,7 @@ export default function DashboardAdmin({
                         </tr>
                       </thead>
                       <tbody>
-                        {users
-                          .filter(u => u.role === 'anggota')
+                        {filteredUsersList
                           .slice((currentPageLaporanAnggota - 1) * 10, currentPageLaporanAnggota * 10)
                           .map(u => (
                             <tr key={u.id} className="border-b border-slate-100 hover:bg-slate-50/20 transition font-semibold text-slate-650">
@@ -1649,14 +1791,26 @@ export default function DashboardAdmin({
                                   {u.status}
                                 </span>
                               </td>
-                              <td className="p-3 text-right">
+                              <td className="p-3 text-right space-x-1.5">
                                 <button
                                   type="button"
                                   onClick={() => setViewingMemberDetails(u)}
-                                  className="p-2 hover:bg-brand-blue/5 text-brand-blue hover:text-brand-blue/80 rounded-xl transition inline-flex items-center justify-center border border-slate-100"
+                                  className="p-1.5 hover:bg-brand-blue/5 text-brand-blue hover:text-brand-blue/80 rounded-lg transition inline-flex items-center justify-center border border-slate-100"
                                   title="Detail Anggota"
                                 >
-                                  <Eye size={14} />
+                                  <Eye size={12} />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleMemberStatus(u)}
+                                  className={`p-1.5 rounded-lg transition inline-flex items-center justify-center border ${
+                                    u.status === 'Aktif'
+                                      ? 'hover:bg-rose-50 text-brand-red border-rose-150'
+                                      : 'hover:bg-emerald-50 text-emerald-700 border-emerald-150'
+                                  }`}
+                                  title={u.status === 'Aktif' ? 'Nonaktifkan Anggota' : 'Aktifkan Anggota'}
+                                >
+                                  {u.status === 'Aktif' ? <UserX size={12} /> : <UserCheck size={12} />}
                                 </button>
                               </td>
 
@@ -1664,7 +1818,7 @@ export default function DashboardAdmin({
                           ))}
                       </tbody>
                     </table>
-                    {renderPagination(currentPageLaporanAnggota, users.filter(u => u.role === 'anggota').length, setCurrentPageLaporanAnggota)}
+                    {renderPagination(currentPageLaporanAnggota, filteredUsersList.length, setCurrentPageLaporanAnggota)}
                   </div>
                 </div>
 
@@ -1743,12 +1897,12 @@ export default function DashboardAdmin({
                 <div className="flex items-center justify-between flex-wrap gap-3 pb-4 border-b border-slate-100">
                   <div>
                     <h3 className="text-sm font-black text-slate-800">Laporan Penjualan Aksesoris</h3>
-                    <p className="text-[10px] text-slate-400 mt-0.5">{accessoryTx.length} transaksi berhasil</p>
+                    <p className="text-[10px] text-slate-400 mt-0.5">{filteredAccessoryTx.length} transaksi ditemukan ({accessoryTx.length} total)</p>
                   </div>
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => exportToCSV('laporan-aksesoris', ['Tanggal', 'Nama Anggota', 'Deskripsi Barang', 'Subtotal (Rp)'],
-                        accessoryTx.map(tx => [tx.date, tx.memberName, tx.details, tx.amount])
+                        filteredAccessoryTx.map(tx => [tx.date, tx.memberName, tx.details, tx.amount])
                       )}
                       className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-[10px] font-black uppercase tracking-wider transition"
                     >
@@ -1764,14 +1918,69 @@ export default function DashboardAdmin({
                     </button>
                   </div>
                 </div>
+
+                {/* Filter Bar */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-50 p-4 rounded-xl border border-slate-100">
+                  <div>
+                    <label className="block text-[9px] font-bold text-slate-500 mb-1">Filter Bulan</label>
+                    <select
+                      value={filterAccMonth}
+                      onChange={e => { setFilterAccMonth(e.target.value); setCurrentPageLaporanAksesoris(1); }}
+                      className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white shadow-xs"
+                    >
+                      <option value="Semua">Semua Bulan</option>
+                      <option value="01">Januari</option>
+                      <option value="02">Februari</option>
+                      <option value="03">Maret</option>
+                      <option value="04">April</option>
+                      <option value="05">Mei</option>
+                      <option value="06">Juni</option>
+                      <option value="07">Juli</option>
+                      <option value="08">Agustus</option>
+                      <option value="09">September</option>
+                      <option value="10">Oktober</option>
+                      <option value="11">November</option>
+                      <option value="12">Desember</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[9px] font-bold text-slate-500 mb-1">Filter Tahun</label>
+                    <select
+                      value={filterAccYear}
+                      onChange={e => { setFilterAccYear(e.target.value); setCurrentPageLaporanAksesoris(1); }}
+                      className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white shadow-xs"
+                    >
+                      <option value="Semua">Semua Tahun</option>
+                      {Array.from(new Set(transactions.map(t => t.date.split('-')[0]))).sort().map(yr => (
+                        <option key={yr} value={yr}>{yr}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[9px] font-bold text-slate-500 mb-1">Filter Aksesoris</label>
+                    <select
+                      value={filterAccProduct}
+                      onChange={e => { setFilterAccProduct(e.target.value); setCurrentPageLaporanAksesoris(1); }}
+                      className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white shadow-xs"
+                    >
+                      <option value="Semua">Semua Aksesoris</option>
+                      {products.filter(p => p.categoryId !== 'cat-1' && p.categoryId !== 'cat-2' && p.categoryId !== 'Pendaftaran' && p.categoryId !== 'UKT').concat(
+                        products.filter(p => p.categoryId === 'cat-1' || p.categoryId === 'cat-2')
+                      ).map(p => (
+                        <option key={p.id} value={p.name}>{p.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                   <div className="bg-slate-50 border border-slate-100 rounded-xl p-5">
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Transaksi</p>
-                    <p className="text-2xl font-black text-slate-800 mt-1">{accessoryTx.length} Pesanan</p>
+                    <p className="text-2xl font-black text-slate-800 mt-1">{filteredAccessoryTx.length} Pesanan</p>
                   </div>
                   <div className="bg-slate-50 border border-slate-100 rounded-xl p-5">
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Penjualan</p>
-                    <p className="text-2xl font-black text-emerald-600 mt-1">Rp {totalAccRevenue.toLocaleString('id-ID')}</p>
+                    <p className="text-2xl font-black text-emerald-600 mt-1">Rp {filteredTotalAccRevenue.toLocaleString('id-ID')}</p>
                   </div>
                 </div>
 
@@ -1801,7 +2010,7 @@ export default function DashboardAdmin({
                           </tr>
                         </thead>
                         <tbody>
-                          {accessoryTx.slice((currentPageLaporanAksesoris - 1) * 10, currentPageLaporanAksesoris * 10).map(tx => (
+                          {filteredAccessoryTx.slice((currentPageLaporanAksesoris - 1) * 10, currentPageLaporanAksesoris * 10).map(tx => (
                             <tr key={tx.id} className="border-b border-slate-100 hover:bg-slate-50/20 transition font-semibold text-slate-650">
                               <td className="p-3">{tx.date}</td>
                               <td className="p-3 font-bold text-slate-800">{tx.memberName}</td>
@@ -1811,7 +2020,7 @@ export default function DashboardAdmin({
                           ))}
                         </tbody>
                       </table>
-                      {renderPagination(currentPageLaporanAksesoris, accessoryTx.length, setCurrentPageLaporanAksesoris)}
+                      {renderPagination(currentPageLaporanAksesoris, filteredAccessoryTx.length, setCurrentPageLaporanAksesoris)}
                     </div>
                   </div>
                 </div>
@@ -1825,12 +2034,12 @@ export default function DashboardAdmin({
                 <div className="flex items-center justify-between flex-wrap gap-3 pb-4 border-b border-slate-100">
                   <div>
                     <h3 className="text-sm font-black text-slate-800">Laporan Event &amp; UKT</h3>
-                    <p className="text-[10px] text-slate-400 mt-0.5">{eventTx.length} peserta terdaftar</p>
+                    <p className="text-[10px] text-slate-400 mt-0.5">{filteredEventTx.length} peserta ditemukan ({eventTx.length} total)</p>
                   </div>
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => exportToCSV('laporan-event-ukt', ['Tanggal', 'Nama Anggota', 'Detail Kegiatan', 'Nominal (Rp)'],
-                        eventTx.map(tx => [tx.date, tx.memberName, tx.details, tx.amount])
+                        filteredEventTx.map(tx => [tx.date, tx.memberName, tx.details, tx.amount])
                       )}
                       className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-[10px] font-black uppercase tracking-wider transition"
                     >
@@ -1846,14 +2055,84 @@ export default function DashboardAdmin({
                     </button>
                   </div>
                 </div>
+
+                {/* Filter Bar */}
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 bg-slate-50 p-4 rounded-xl border border-slate-100">
+                  <div>
+                    <label className="block text-[9px] font-bold text-slate-500 mb-1">Filter Bulan</label>
+                    <select
+                      value={filterEvtMonth}
+                      onChange={e => { setFilterEvtMonth(e.target.value); setCurrentPageLaporanEvent(1); }}
+                      className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white shadow-xs"
+                    >
+                      <option value="Semua">Semua Bulan</option>
+                      <option value="01">Januari</option>
+                      <option value="02">Februari</option>
+                      <option value="03">Maret</option>
+                      <option value="04">April</option>
+                      <option value="05">Mei</option>
+                      <option value="06">Juni</option>
+                      <option value="07">Juli</option>
+                      <option value="08">Agustus</option>
+                      <option value="09">September</option>
+                      <option value="10">Oktober</option>
+                      <option value="11">November</option>
+                      <option value="12">Desember</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[9px] font-bold text-slate-500 mb-1">Filter Tahun</label>
+                    <select
+                      value={filterEvtYear}
+                      onChange={e => { setFilterEvtYear(e.target.value); setCurrentPageLaporanEvent(1); }}
+                      className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white shadow-xs"
+                    >
+                      <option value="Semua">Semua Tahun</option>
+                      {Array.from(new Set(transactions.map(t => t.date.split('-')[0]))).sort().map(yr => (
+                        <option key={yr} value={yr}>{yr}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[9px] font-bold text-slate-500 mb-1">Filter Kegiatan</label>
+                    <select
+                      value={filterEvtName}
+                      onChange={e => { setFilterEvtName(e.target.value); setCurrentPageLaporanEvent(1); }}
+                      className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white shadow-xs"
+                    >
+                      <option value="Semua">Semua Kegiatan</option>
+                      {events.map(ev => (
+                        <option key={ev.id} value={ev.name}>{ev.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[9px] font-bold text-slate-500 mb-1">Filter Sabuk Anggota</label>
+                    <select
+                      value={filterEvtBelt}
+                      onChange={e => { setFilterEvtBelt(e.target.value); setCurrentPageLaporanEvent(1); }}
+                      className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white shadow-xs"
+                    >
+                      <option value="Semua">Semua Sabuk</option>
+                      <option value="Sabuk Putih">Sabuk Putih</option>
+                      <option value="Sabuk Kuning">Sabuk Kuning</option>
+                      <option value="Sabuk Hijau">Sabuk Hijau</option>
+                      <option value="Sabuk Biru">Sabuk Biru</option>
+                      <option value="Sabuk Merah">Sabuk Merah</option>
+                      <option value="Sabuk Hitam">Sabuk Hitam</option>
+                      <option value="Poom">Poom / Dan</option>
+                    </select>
+                  </div>
+                </div>
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                   <div className="bg-slate-50 border border-slate-100 rounded-xl p-5">
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Peserta UKT/Event</p>
-                    <p className="text-2xl font-black text-slate-800 mt-1">{eventTx.length} Orang</p>
+                    <p className="text-2xl font-black text-slate-800 mt-1">{filteredEventTx.length} Orang</p>
                   </div>
                   <div className="bg-slate-50 border border-slate-100 rounded-xl p-5">
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Biaya Pendaftaran</p>
-                    <p className="text-2xl font-black text-emerald-600 mt-1">Rp {totalEvtRevenue.toLocaleString('id-ID')}</p>
+                    <p className="text-2xl font-black text-emerald-600 mt-1">Rp {filteredTotalEvtRevenue.toLocaleString('id-ID')}</p>
                   </div>
                 </div>
 
@@ -1878,20 +2157,22 @@ export default function DashboardAdmin({
                           <tr className="bg-slate-50 text-slate-500 font-extrabold border-b border-slate-100">
                             <th className="p-3">Tanggal</th>
                             <th className="p-3">Nama Anggota</th>
+                            <th className="p-3">Detail Kegiatan</th>
                             <th className="p-3 text-right">Nominal</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {eventTx.slice((currentPageLaporanEvent - 1) * 10, currentPageLaporanEvent * 10).map(tx => (
+                          {filteredEventTx.slice((currentPageLaporanEvent - 1) * 10, currentPageLaporanEvent * 10).map(tx => (
                             <tr key={tx.id} className="border-b border-slate-100 hover:bg-slate-50/20 transition font-semibold text-slate-650">
                               <td className="p-3">{tx.date}</td>
                               <td className="p-3 font-bold text-slate-800">{tx.memberName}</td>
+                              <td className="p-3">{tx.details}</td>
                               <td className="p-3 text-brand-blue font-bold text-right">Rp {tx.amount.toLocaleString('id-ID')}</td>
                             </tr>
                           ))}
                         </tbody>
                       </table>
-                      {renderPagination(currentPageLaporanEvent, eventTx.length, setCurrentPageLaporanEvent)}
+                      {renderPagination(currentPageLaporanEvent, filteredEventTx.length, setCurrentPageLaporanEvent)}
                     </div>
                   </div>
                 </div>
@@ -1905,12 +2186,12 @@ export default function DashboardAdmin({
                 <div className="flex items-center justify-between flex-wrap gap-3 pb-4 border-b border-slate-100">
                   <div>
                     <h3 className="text-sm font-black text-slate-800">Laporan Keuangan &amp; Total Keseluruhan</h3>
-                    <p className="text-[10px] text-slate-400 mt-0.5">Rekapitulasi total pendapatan dari seluruh aktivitas club</p>
+                    <p className="text-[10px] text-slate-400 mt-0.5">{filteredFinTx.length} transaksi berhasil ditemukan ({transactions.filter(t => t.status === 'Berhasil').length} total)</p>
                   </div>
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => exportToCSV('laporan-keuangan-total', ['Tanggal', 'ID Transaksi', 'Nama Anggota', 'Tipe', 'Deskripsi', 'Nominal (Rp)'],
-                        transactions.filter(t => t.status === 'Berhasil').map(tx => [tx.date, tx.id, tx.memberName, tx.type, tx.details, tx.amount])
+                        filteredFinTx.map(tx => [tx.date, tx.id, tx.memberName, tx.type, tx.details, tx.amount])
                       )}
                       className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-[10px] font-black uppercase tracking-wider transition"
                     >
@@ -1927,23 +2208,62 @@ export default function DashboardAdmin({
                   </div>
                 </div>
 
+                {/* Filter Bar */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 bg-slate-50 p-4 rounded-xl border border-slate-100">
+                  <div>
+                    <label className="block text-[9px] font-bold text-slate-500 mb-1">Filter Bulan</label>
+                    <select
+                      value={filterFinMonth}
+                      onChange={e => setFilterFinMonth(e.target.value)}
+                      className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white shadow-xs"
+                    >
+                      <option value="Semua">Semua Bulan</option>
+                      <option value="01">Januari</option>
+                      <option value="02">Februari</option>
+                      <option value="03">Maret</option>
+                      <option value="04">April</option>
+                      <option value="05">Mei</option>
+                      <option value="06">Juni</option>
+                      <option value="07">Juli</option>
+                      <option value="08">Agustus</option>
+                      <option value="09">September</option>
+                      <option value="10">Oktober</option>
+                      <option value="11">November</option>
+                      <option value="12">Desember</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-[9px] font-bold text-slate-500 mb-1">Filter Tahun</label>
+                    <select
+                      value={filterFinYear}
+                      onChange={e => setFilterFinYear(e.target.value)}
+                      className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white shadow-xs"
+                    >
+                      <option value="Semua">Semua Tahun</option>
+                      {Array.from(new Set(transactions.map(t => t.date.split('-')[0]))).sort().map(yr => (
+                        <option key={yr} value={yr}>{yr}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
                 {/* Stats Summary Card Row */}
                 <div className="grid grid-cols-1 sm:grid-cols-4 gap-6">
                   <div className="bg-slate-50 border border-slate-100 rounded-xl p-5">
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Pendapatan Pendaftaran</p>
-                    <p className="text-xl font-black text-slate-850 mt-1">Rp {totalRegRevenue.toLocaleString('id-ID')}</p>
+                    <p className="text-xl font-black text-slate-850 mt-1">Rp {filteredRegRevenue.toLocaleString('id-ID')}</p>
                   </div>
                   <div className="bg-slate-50 border border-slate-100 rounded-xl p-5">
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Pendapatan Aksesoris</p>
-                    <p className="text-xl font-black text-slate-850 mt-1">Rp {totalAccRevenue.toLocaleString('id-ID')}</p>
+                    <p className="text-xl font-black text-slate-850 mt-1">Rp {filteredAccRevenueFin.toLocaleString('id-ID')}</p>
                   </div>
                   <div className="bg-slate-50 border border-slate-100 rounded-xl p-5">
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Pendapatan Event / UKT</p>
-                    <p className="text-xl font-black text-slate-850 mt-1">Rp {totalEvtRevenue.toLocaleString('id-ID')}</p>
+                    <p className="text-xl font-black text-slate-850 mt-1">Rp {filteredEvtRevenueFin.toLocaleString('id-ID')}</p>
                   </div>
                   <div className="bg-blue-50 border border-blue-100 rounded-xl p-5 shadow-sm shadow-brand-blue/5">
                     <p className="text-[10px] font-black text-brand-blue uppercase tracking-widest">Total Keseluruhan</p>
-                    <p className="text-2xl font-black text-brand-blue mt-1">Rp {totalRevenue.toLocaleString('id-ID')}</p>
+                    <p className="text-2xl font-black text-brand-blue mt-1">Rp {filteredTotalRevenue.toLocaleString('id-ID')}</p>
                   </div>
                 </div>
 
@@ -1951,9 +2271,9 @@ export default function DashboardAdmin({
                 <div className="bg-slate-50 rounded-2xl p-5 border border-slate-100">
                   <h4 className="font-black text-[10px] text-slate-400 uppercase tracking-widest mb-3">Persentase Breakdown Pendapatan</h4>
                   {(() => {
-                    const regPct = totalRevenue > 0 ? (totalRegRevenue / totalRevenue) * 100 : 0;
-                    const accPct = totalRevenue > 0 ? (totalAccRevenue / totalRevenue) * 100 : 0;
-                    const evtPct = totalRevenue > 0 ? (totalEvtRevenue / totalRevenue) * 100 : 0;
+                    const regPct = filteredTotalRevenue > 0 ? (filteredRegRevenue / filteredTotalRevenue) * 100 : 0;
+                    const accPct = filteredTotalRevenue > 0 ? (filteredAccRevenueFin / filteredTotalRevenue) * 100 : 0;
+                    const evtPct = filteredTotalRevenue > 0 ? (filteredEvtRevenueFin / filteredTotalRevenue) * 100 : 0;
                     return (
                       <div className="space-y-4">
                         <div className="w-full h-4 bg-slate-200 rounded-full overflow-hidden flex">
@@ -1961,7 +2281,7 @@ export default function DashboardAdmin({
                           <div style={{ width: `${accPct}%` }} className="bg-emerald-500" title={`Aksesoris: ${accPct.toFixed(1)}%`}></div>
                           <div style={{ width: `${evtPct}%` }} className="bg-brand-red" title={`Event: ${evtPct.toFixed(1)}%`}></div>
                         </div>
-                        <div className="flex flex-wrap gap-6 text-xs font-bold text-slate-600 justify-center">
+                        <div className="flex flex-wrap gap-6 text-xs font-bold text-slate-650 justify-center">
                           <div className="flex items-center gap-2">
                             <span className="w-3 h-3 bg-brand-blue rounded"></span>
                             <span>Pendaftaran ({regPct.toFixed(1)}%)</span>
@@ -1997,8 +2317,7 @@ export default function DashboardAdmin({
                         </tr>
                       </thead>
                       <tbody>
-                        {transactions
-                          .filter(t => t.status === 'Berhasil')
+                        {filteredFinTx
                           .map(tx => (
                             <tr key={tx.id} className="border-b border-slate-100 hover:bg-slate-50/20 transition font-semibold text-slate-650">
                               <td className="p-3">{tx.date}</td>
@@ -2015,7 +2334,7 @@ export default function DashboardAdmin({
                                 <button
                                   type="button"
                                   onClick={() => printKwitansi(tx)}
-                                  className="text-[9px] text-emerald-600 hover:text-emerald-700 font-extrabold flex items-center gap-1 border border-emerald-100 bg-emerald-50/30 px-2 py-0.5 rounded-lg hover:bg-emerald-50 transition mx-auto"
+                                  className="text-[9px] text-emerald-650 hover:text-emerald-700 font-extrabold flex items-center gap-1 border border-emerald-100 bg-emerald-50/30 px-2 py-0.5 rounded-lg hover:bg-emerald-50 transition mx-auto"
                                 >
                                   🧾 Kwitansi
                                 </button>
@@ -2104,12 +2423,13 @@ export default function DashboardAdmin({
                     {!editingEvent && (
                       <button
                         onClick={() => {
-                          setEditingEvent({ id: '', name: '', date: '', location: '', price: 0, category: 'Semua Tingkatan' });
+                          setEditingEvent({ id: '', name: '', date: '', location: '', price: 0, category: 'Semua Tingkatan', status: 'Aktif' });
                           setEvtName('');
                           setEvtDate('');
                           setEvtLoc('');
                           setEvtPrice('');
                           setEvtCat('Semua Tingkatan');
+                          setEvtStatus('Aktif');
                         }}
                         className="px-2.5 py-1 bg-brand-blue text-white text-[9px] font-black uppercase rounded-lg"
                       >
@@ -2152,8 +2472,8 @@ export default function DashboardAdmin({
                           />
                         </div>
                       </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
+                      <div className="grid grid-cols-3 gap-3">
+                        <div className="col-span-1">
                           <label className="block text-[9px] font-bold text-slate-500 mb-0.5">Lokasi</label>
                           <input
                             type="text"
@@ -2162,7 +2482,7 @@ export default function DashboardAdmin({
                             className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white"
                           />
                         </div>
-                        <div>
+                        <div className="col-span-1">
                           <label className="block text-[9px] font-bold text-slate-500 mb-0.5">Biaya (Rp)</label>
                           <input
                             type="text"
@@ -2172,6 +2492,17 @@ export default function DashboardAdmin({
                             className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white"
                             required
                           />
+                        </div>
+                        <div className="col-span-1">
+                          <label className="block text-[9px] font-bold text-slate-500 mb-0.5">Status</label>
+                          <select
+                            value={evtStatus}
+                            onChange={e => setEvtStatus(e.target.value as 'Aktif' | 'Nonaktif')}
+                            className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white"
+                          >
+                            <option value="Aktif">Aktif</option>
+                            <option value="Nonaktif">Nonaktif</option>
+                          </select>
                         </div>
                       </div>
 
@@ -2209,7 +2540,14 @@ export default function DashboardAdmin({
                           <tr key={ev.id} className="border-b border-slate-100 hover:bg-slate-50/20 transition font-semibold text-slate-650">
                             <td className="p-3">
                               <div className="flex flex-col">
-                                <span className="font-bold text-slate-800">{ev.name}</span>
+                                <div className="flex items-center gap-2">
+                                  <span className="font-bold text-slate-800">{ev.name}</span>
+                                  <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase ${
+                                    ev.status === 'Nonaktif' ? 'bg-rose-50 text-brand-red border border-rose-100' : 'bg-emerald-50 text-emerald-700 border border-emerald-100'
+                                  }`}>
+                                    {ev.status || 'Aktif'}
+                                  </span>
+                                </div>
                                 <span className="text-[9px] text-slate-400 mt-0.5">📅 {ev.date || '--'} | 📍 {ev.location || '--'}</span>
                               </div>
 
@@ -2224,6 +2562,7 @@ export default function DashboardAdmin({
                                   setEvtLoc(ev.location);
                                   setEvtPrice(ev.price);
                                   setEvtCat(ev.category);
+                                  setEvtStatus(ev.status || 'Aktif');
                                 }}
                                 className="text-[9px] font-black text-brand-blue uppercase hover:underline"
                               >

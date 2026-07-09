@@ -150,6 +150,11 @@ export default function DashboardAnggota({
   const printKwitansi = (tx: Transaction) => {
     const printWindow = window.open('', '_blank', 'width=600,height=700');
     if (!printWindow) return;
+
+    const instructionNote = tx.type === 'Aksesoris'
+      ? 'Silahkan tunjukan kwitansi dan ambil aksesoris anda di dojang.'
+      : 'Silahkan tunjukan kwitansi ke sabeum dojang anda.';
+
     printWindow.document.write(`
       <html><head><title>Kwitansi Pembayaran #${tx.id}</title>
       <style>
@@ -201,6 +206,7 @@ export default function DashboardAnggota({
         </div>
         <div class="footer">
           <p>Terima kasih atas pembayaran Anda.</p>
+          <p style="font-weight: bold; margin: 6px 0; color: #000;">* ${instructionNote} *</p>
           <p>Kwitansi ini adalah bukti pembayaran yang sah.</p>
         </div>
       </div>
@@ -349,6 +355,7 @@ export default function DashboardAnggota({
   } | null>(null);
   const [checkoutFile, setCheckoutFile] = useState<File | null>(null);
   const [checkoutPreview, setCheckoutPreview] = useState<string>('');
+  const [checkoutBelt, setCheckoutBelt] = useState<string>('');
 
   // Re-upload proof state (for rejected payments)
   const [reUploadTx, setReUploadTx] = useState<Transaction | null>(null);
@@ -414,6 +421,7 @@ export default function DashboardAnggota({
     });
     setCheckoutFile(null);
     setCheckoutPreview('');
+    setCheckoutBelt(user.belt || 'Sabuk Putih');
   };
 
 
@@ -445,12 +453,13 @@ export default function DashboardAnggota({
       const uploadData = checkoutFile || checkoutPreview;
       const imageUrl = await db.uploadImage(uploadData);
 
+      const uktBeltSuffix = checkoutItem.type === 'UKT' ? ` (Sabuk Terakhir: ${checkoutBelt})` : '';
       const newTx: Transaction = {
         id: 'tx-' + Date.now(),
         memberId: user.id,
         memberName: user.name,
         type: checkoutItem.type,
-        details: `${checkoutItem.type === 'UKT' ? 'Pendaftaran Event' : 'Pembelian Aksesoris'}: ${checkoutItem.name}`,
+        details: `${checkoutItem.type === 'UKT' ? 'Pendaftaran Event' : 'Pembelian Aksesoris'}: ${checkoutItem.name}${uktBeltSuffix}`,
         amount: checkoutItem.price,
         proofImage: imageUrl,
         status: 'Pending',
@@ -919,22 +928,50 @@ export default function DashboardAnggota({
                         📅 {evt.date || '--'} | 📍 {evt.location || '--'}
                       </p>
 
-                      {isApproved ? (
-                        <div className="w-full text-center py-2 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-xl text-[10px] font-bold">
-                          ✓ Terdaftar &amp; Aktif
-                        </div>
-                      ) : isRegistered ? (
-                        <div className="w-full text-center py-2 bg-slate-100 text-slate-500 border border-slate-200 rounded-xl text-[10px] font-bold">
-                          ⏳ Verifikasi Bukti Bayar
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => openCheckout('UKT', evt)}
-                          className="w-full py-2 bg-brand-blue hover:bg-brand-blue-hover text-white rounded-xl text-[11px] font-black uppercase tracking-wider transition"
-                        >
-                          Ikuti Event
-                        </button>
-                      )}
+                      {(() => {
+                        const d = new Date();
+                        const year = d.getFullYear();
+                        const month = String(d.getMonth() + 1).padStart(2, '0');
+                        const day = String(d.getDate()).padStart(2, '0');
+                        const todayStr = `${year}-${month}-${day}`;
+                        
+                        const isEventExpired = evt.date ? evt.date < todayStr : false;
+                        const isEventInactive = evt.status === 'Nonaktif';
+                        const isClosed = isEventExpired || isEventInactive;
+
+                        if (isApproved) {
+                          return (
+                            <div className="w-full text-center py-2 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-xl text-[10px] font-bold">
+                              ✓ Terdaftar &amp; Aktif
+                            </div>
+                          );
+                        }
+                        if (isRegistered) {
+                          return (
+                            <div className="w-full text-center py-2 bg-slate-100 text-slate-500 border border-slate-200 rounded-xl text-[10px] font-bold">
+                              ⏳ Verifikasi Bukti Bayar
+                            </div>
+                          );
+                        }
+                        if (isClosed) {
+                          return (
+                            <button
+                              disabled
+                              className="w-full py-2 bg-slate-100 border border-slate-200 text-slate-400 rounded-xl text-[11px] font-bold uppercase tracking-wider cursor-not-allowed"
+                            >
+                              {isEventExpired ? 'Event Berakhir' : 'Tidak Aktif'}
+                            </button>
+                          );
+                        }
+                        return (
+                          <button
+                            onClick={() => openCheckout('UKT', evt)}
+                            className="w-full py-2 bg-brand-blue hover:bg-brand-blue-hover text-white rounded-xl text-[11px] font-black uppercase tracking-wider transition"
+                          >
+                            Ikuti Event
+                          </button>
+                        );
+                      })()}
                     </div>
                   );
                 })}
@@ -981,6 +1018,20 @@ export default function DashboardAnggota({
               </div>
 
               <form onSubmit={handleCheckoutSubmit} className="space-y-4">
+                {checkoutItem.type === 'UKT' && (
+                  <div>
+                    <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1">Sabuk Terakhir</label>
+                    <input
+                      type="text"
+                      value={checkoutBelt}
+                      onChange={e => setCheckoutBelt(e.target.value)}
+                      placeholder="Contoh: Sabuk Hijau"
+                      className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white"
+                      required
+                    />
+                  </div>
+                )}
+
                 <div className="space-y-1">
                   <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider">
                     Upload File Bukti Transfer
