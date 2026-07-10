@@ -827,14 +827,12 @@ export default function LandingPage({
 
                 {checkoutItem.type === 'UKT' && (
                   <div>
-                    <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1">Sabuk Terakhir</label>
+                    <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1">Sabuk Terakhir (Otomatis)</label>
                     <input
                       type="text"
                       value={checkoutBelt}
-                      onChange={e => setCheckoutBelt(e.target.value)}
-                      placeholder="Contoh: Sabuk Hijau"
-                      className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white"
-                      required
+                      disabled
+                      className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden bg-slate-100 text-slate-400 cursor-not-allowed select-none"
                     />
                   </div>
                 )}

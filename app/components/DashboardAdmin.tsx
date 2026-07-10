@@ -104,6 +104,9 @@ export default function DashboardAdmin({
   const [events, setEvents] = useState<Event[]>([]);
   const [settings, setSettings] = useState<SystemSettings | null>(null);
 
+  // Custom Belt Dropdown State
+  const [beltDropdownOpen, setBeltDropdownOpen] = useState(false);
+
   // Modal / Interaction states
   const [loading, setLoading] = useState(false);
   const [rejectingTx, setRejectingTx] = useState<Transaction | null>(null);
@@ -499,6 +502,22 @@ export default function DashboardAdmin({
     } catch (err) {
       console.error(err);
       toastError('Gagal mengubah status anggota.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpdateMemberBelt = async (memberToUpdate: User, newBelt: string) => {
+    setLoading(true);
+    try {
+      const updatedUser: User = { ...memberToUpdate, belt: newBelt };
+      await db.updateUser(updatedUser);
+      await loadAdminData();
+      setViewingMemberDetails(updatedUser);
+      toastSuccess(`Sabuk anggota ${memberToUpdate.name} berhasil diubah menjadi ${newBelt}.`);
+    } catch (err) {
+      console.error(err);
+      toastError('Gagal mengubah sabuk anggota.');
     } finally {
       setLoading(false);
     }
@@ -2756,14 +2775,14 @@ export default function DashboardAdmin({
 
       {/* MEMBER DETAILS MODAL */}
       {viewingMemberDetails && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 animate-fade-in" onClick={() => setViewingMemberDetails(null)}>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 animate-fade-in" onClick={() => { setViewingMemberDetails(null); setBeltDropdownOpen(false); }}>
           <div className="bg-white rounded-3xl border border-slate-100 max-w-lg w-full overflow-hidden shadow-2xl animate-scale-up" onClick={e => e.stopPropagation()}>
             <div className="border-b border-slate-100 p-6 flex justify-between items-center bg-slate-50/50">
               <div>
                 <h3 className="font-black text-sm text-slate-800 font-sans">Detail Profil Anggota</h3>
                 <p className="text-[9px] text-slate-400 uppercase tracking-widest mt-0.5 font-sans">ID: {viewingMemberDetails.id}</p>
               </div>
-              <button onClick={() => setViewingMemberDetails(null)} className="text-slate-400 hover:text-slate-650 font-bold transition">
+              <button onClick={() => { setViewingMemberDetails(null); setBeltDropdownOpen(false); }} className="text-slate-400 hover:text-slate-650 font-bold transition">
                 ✕
               </button>
             </div>
@@ -2878,6 +2897,90 @@ export default function DashboardAdmin({
                     <p className="text-slate-800 font-bold mt-0.5">{viewingMemberDetails.dojang || '-'}</p>
                   </div>
                 </div>
+
+                {/* Belt Dropdown Panel for Admin */}
+                <div className="bg-slate-50/70 rounded-2xl p-3 border border-slate-100/50 flex items-center gap-3 sm:col-span-2">
+                  <div className="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500 shrink-0">
+                    <Award size={14} className="text-brand-red animate-pulse" />
+                  </div>
+                  <div className="flex-1 flex items-center justify-between gap-4 flex-wrap sm:flex-nowrap relative">
+                    <div>
+                      <p className="text-[9px] text-slate-400 uppercase font-black tracking-wider">Ubah Sabuk Anggota</p>
+                      <p className="text-[10px] text-slate-500 mt-0.5 font-bold">Pilih tingkat sabuk baru:</p>
+                    </div>
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setBeltDropdownOpen(!beltDropdownOpen)}
+                        disabled={loading}
+                        className="px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold bg-white shadow-xs hover:bg-slate-50 transition inline-flex items-center gap-2 min-w-[150px] justify-between text-slate-800"
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <span className={`w-3 h-3 rounded-full border border-slate-350 ${
+                            (viewingMemberDetails.belt || 'Sabuk Putih') === 'Sabuk Putih' ? 'bg-white' :
+                            (viewingMemberDetails.belt || 'Sabuk Putih') === 'Sabuk Kuning' ? 'bg-yellow-400' :
+                            (viewingMemberDetails.belt || 'Sabuk Putih') === 'Sabuk Hijau' ? 'bg-emerald-500' :
+                            (viewingMemberDetails.belt || 'Sabuk Putih') === 'Sabuk Biru' ? 'bg-blue-600' :
+                            (viewingMemberDetails.belt || 'Sabuk Putih') === 'Sabuk Merah' ? 'bg-rose-600' :
+                            (viewingMemberDetails.belt || 'Sabuk Putih').startsWith('Poom') ? 'bg-gradient-to-br from-red-500 to-slate-900' :
+                            'bg-slate-900'
+                          }`} />
+                          <span>{viewingMemberDetails.belt || 'Sabuk Putih'}</span>
+                        </div>
+                        <span className={`text-[9px] text-slate-400 transform transition-transform ${beltDropdownOpen ? 'rotate-180' : ''}`}>▼</span>
+                      </button>
+
+                      {beltDropdownOpen && (
+                        <div className="absolute right-0 bottom-full mb-2 z-[110] w-[215px] max-h-[220px] overflow-y-auto bg-white border border-slate-150 rounded-2xl shadow-xl p-1.5 animate-scale-up scrollbar-thin">
+                          <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest px-2 py-1 mb-1 border-b border-slate-100">Daftar Sabuk</p>
+                          {[
+                            'Sabuk Putih',
+                            'Sabuk Kuning',
+                            'Sabuk Hijau',
+                            'Sabuk Biru',
+                            'Sabuk Merah',
+                            'Sabuk Hitam',
+                            'Poom 1',
+                            'Poom 2',
+                            'Poom 3',
+                            'Dan 1',
+                            'Dan 2',
+                            'Dan 3',
+                            'Dan 4'
+                          ].map((b) => (
+                            <button
+                              key={b}
+                              type="button"
+                              onClick={async () => {
+                                setBeltDropdownOpen(false);
+                                await handleUpdateMemberBelt(viewingMemberDetails, b);
+                              }}
+                              className={`w-full text-left px-2 py-1.5 rounded-lg text-xs font-semibold hover:bg-slate-50 active:bg-slate-100 transition flex items-center justify-between text-slate-700 ${
+                                (viewingMemberDetails.belt || 'Sabuk Putih') === b ? 'bg-slate-50 text-brand-blue font-black' : ''
+                              }`}
+                            >
+                              <div className="flex items-center gap-2">
+                                <span className={`w-2.5 h-2.5 rounded-full border border-slate-350 ${
+                                  b === 'Sabuk Putih' ? 'bg-white' :
+                                  b === 'Sabuk Kuning' ? 'bg-yellow-400' :
+                                  b === 'Sabuk Hijau' ? 'bg-emerald-500' :
+                                  b === 'Sabuk Biru' ? 'bg-blue-600' :
+                                  b === 'Sabuk Merah' ? 'bg-rose-600' :
+                                  b.startsWith('Poom') ? 'bg-gradient-to-r from-red-500 to-slate-900' :
+                                  'bg-slate-900'
+                                }`} />
+                                <span>{b}</span>
+                              </div>
+                              {(viewingMemberDetails.belt || 'Sabuk Putih') === b && (
+                                <span className="text-brand-blue text-[9px] font-black">✓</span>
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -2897,7 +3000,7 @@ export default function DashboardAdmin({
               )}
               <button
                 type="button"
-                onClick={() => setViewingMemberDetails(null)}
+                onClick={() => { setViewingMemberDetails(null); setBeltDropdownOpen(false); }}
                 className="px-5 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-black uppercase rounded-xl transition font-sans"
               >
                 Tutup
