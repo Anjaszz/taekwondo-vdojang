@@ -345,6 +345,66 @@ export default function DashboardAnggota({
   // Operation States
   const [loading, setLoading] = useState(false);
 
+  // helper to calculate UKT belt price
+  const getEventPriceForBelt = (eventCategory: string, eventBasePrice: number, belt: string): number => {
+    if (eventCategory && eventCategory.includes(':::')) {
+      try {
+        const parts = eventCategory.split(':::');
+        const parsed = JSON.parse(parts[1]);
+        if (parsed && typeof parsed === 'object') {
+          const pricesObj = parsed.beltPrices || parsed;
+          if (belt && pricesObj[belt] !== undefined && pricesObj[belt] !== null) {
+            return Number(pricesObj[belt]) || eventBasePrice;
+          }
+        }
+      } catch (e) {
+        console.error('Error parsing belt prices:', e);
+      }
+    }
+    return eventBasePrice;
+  };
+
+  // helper to parse event category JSON
+  const parseEventCategory = (categoryStr: string) => {
+    if (!categoryStr) return { name: '', allowedBelts: null, beltPrices: null, useCustomPrices: false };
+    if (categoryStr.includes(':::')) {
+      const parts = categoryStr.split(':::');
+      const name = parts[0];
+      try {
+        const parsed = JSON.parse(parts[1]);
+        if (parsed && typeof parsed === 'object') {
+          if (parsed.allowedBelts !== undefined) {
+            return {
+              name,
+              allowedBelts: parsed.allowedBelts as string[],
+              beltPrices: parsed.beltPrices as Record<string, number>,
+              useCustomPrices: !!parsed.useCustomPrices
+            };
+          }
+          return {
+            name,
+            allowedBelts: null,
+            beltPrices: parsed as Record<string, number>,
+            useCustomPrices: true
+          };
+        }
+      } catch (e) {
+        console.error('Error parsing JSON:', e);
+      }
+      return { name, allowedBelts: null, beltPrices: null, useCustomPrices: false };
+    }
+    return { name: categoryStr, allowedBelts: null, beltPrices: null, useCustomPrices: false };
+  };
+
+  // Registration Form States
+  const [regName, setRegName] = useState('');
+  const [regBirthPlace, setRegBirthPlace] = useState('');
+  const [regBirthDate, setRegBirthDate] = useState('');
+  const [regAddress, setRegAddress] = useState('');
+  const [regUnit, setRegUnit] = useState('');
+  const [regBelt, setRegBelt] = useState('');
+  const [regParentPhone, setRegParentPhone] = useState('');
+
   // Modal / Checkout states
   const [checkoutItem, setCheckoutItem] = useState<{
     type: 'UKT' | 'Aksesoris';
@@ -422,6 +482,15 @@ export default function DashboardAnggota({
     setCheckoutFile(null);
     setCheckoutPreview('');
     setCheckoutBelt(user.belt || 'Sabuk Putih');
+
+    // Reset registration form
+    setRegName(user.name || '');
+    setRegBirthPlace('');
+    setRegBirthDate('');
+    setRegAddress('');
+    setRegUnit(user.dojang || '');
+    setRegBelt(user.belt || 'Sabuk Putih');
+    setRegParentPhone(user.phone || '');
   };
 
 
@@ -453,14 +522,35 @@ export default function DashboardAnggota({
       const uploadData = checkoutFile || checkoutPreview;
       const imageUrl = await db.uploadImage(uploadData);
 
-      const uktBeltSuffix = checkoutItem.type === 'UKT' ? ` (Sabuk Terakhir: ${checkoutBelt})` : '';
+      const isUKT = checkoutItem.type === 'UKT';
+      const eventItem = events.find(e => e.id === checkoutItem.id);
+      const eventCategoryStr = eventItem ? eventItem.category : '';
+      const calculatedPrice = isUKT
+        ? getEventPriceForBelt(eventCategoryStr, checkoutItem.price, regBelt)
+        : checkoutItem.price;
+
+      let detailsString = '';
+      if (isUKT) {
+        detailsString = `Pendaftaran Event: ${checkoutItem.name}
+-----------------------------
+Formulir Registrasi:
+- Nama Lengkap: ${regName}
+- Tempat, Tgl Lahir: ${regBirthPlace}, ${regBirthDate}
+- Alamat: ${regAddress}
+- Unit Latihan / Sekolah: ${regUnit}
+- Sabuk Saat Ini: ${regBelt}
+- No Telp Orang Tua: ${regParentPhone}`;
+      } else {
+        detailsString = `Pembelian Aksesoris: ${checkoutItem.name}`;
+      }
+
       const newTx: Transaction = {
         id: 'tx-' + Date.now(),
         memberId: user.id,
         memberName: user.name,
         type: checkoutItem.type,
-        details: `${checkoutItem.type === 'UKT' ? 'Pendaftaran Event' : 'Pembelian Aksesoris'}: ${checkoutItem.name}${uktBeltSuffix}`,
-        amount: checkoutItem.price,
+        details: detailsString,
+        amount: calculatedPrice,
         proofImage: imageUrl,
         status: 'Pending',
         date: new Date().toISOString().split('T')[0],
@@ -801,13 +891,23 @@ export default function DashboardAnggota({
                     </div>
                   </div>
 
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="px-5 py-2.5 bg-brand-blue hover:bg-brand-blue-hover text-white text-xs font-black uppercase tracking-wider rounded-xl transition"
-                  >
-                    {loading ? 'Menyimpan...' : 'Simpan Profil'}
-                  </button>
+                  {(() => {
+                  const eventItem = checkoutItem && checkoutItem.type === 'UKT' ? events.find(e => e.id === checkoutItem.id) : null;
+                  const parsedCat = eventItem ? parseEventCategory(eventItem.category || '') : null;
+                  const isAllowed = !parsedCat || !parsedCat.allowedBelts || parsedCat.allowedBelts.includes(regBelt);
+
+                  if (!isAllowed) return null;
+
+                  return (
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className="w-full py-3 bg-brand-red hover:bg-brand-red-hover text-white text-xs font-black uppercase tracking-wider rounded-xl transition flex items-center justify-center gap-2"
+                    >
+                      {loading ? 'Mengirim...' : 'Kirim Bukti Pembayaran'}
+                    </button>
+                  );
+                })()}
                 </form>
               </div>
             </div>
@@ -984,29 +1084,32 @@ export default function DashboardAnggota({
 
       {/* CHECKOUT MODAL */}
       {checkoutItem && settings && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4">
-          <div className="bg-white rounded-2xl border border-slate-100 w-full max-w-sm overflow-hidden shadow-lg animate-fade-in">
-            <div className="border-b border-slate-100 p-5 flex justify-between items-center">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-3xl border border-slate-100 w-full max-w-md overflow-hidden shadow-2xl animate-scale-up max-h-[90vh] flex flex-col">
+            <div className="border-b border-slate-100 p-5 flex justify-between items-center bg-slate-50/50">
               <div>
                 <h3 className="font-black text-sm text-slate-800">Checkout Pembayaran</h3>
                 <p className="text-[9px] text-slate-400 uppercase tracking-widest mt-0.5">{checkoutItem.type}</p>
               </div>
-              <button onClick={() => setCheckoutItem(null)} className="text-slate-400 hover:text-slate-600 font-bold">
+              <button onClick={() => setCheckoutItem(null)} className="text-slate-400 hover:text-slate-655 font-bold transition">
                 ✕
               </button>
             </div>
 
-            <div className="p-6 space-y-6">
+            <div className="p-6 space-y-5 overflow-y-auto scrollbar-thin flex-1 text-xs">
               <div>
                 <p className="text-[9px] font-black uppercase text-slate-400">Rincian:</p>
-                <h4 className="font-extrabold text-slate-800 text-sm mt-0.5 leading-snug">{checkoutItem.name}</h4>
+                <h4 className="font-extrabold text-slate-850 text-sm mt-0.5 leading-snug">{checkoutItem.name}</h4>
               </div>
 
               <div className="bg-slate-50 border border-slate-100 rounded-xl p-4 text-center space-y-3">
                 <div>
                   <p className="text-[9px] font-black text-slate-400 uppercase">Transfer Nominal</p>
                   <p className="text-xl font-black text-brand-blue">
-                    Rp {checkoutItem.price.toLocaleString('id-ID')}
+                    Rp {((checkoutItem.type === 'UKT')
+                      ? getEventPriceForBelt(events.find(e => e.id === checkoutItem.id)?.category || '', checkoutItem.price, regBelt)
+                      : checkoutItem.price
+                    ).toLocaleString('id-ID')}
                   </p>
                 </div>
                 <div className="border-t border-slate-200/50 pt-2.5 text-[11px] font-semibold text-slate-500 space-y-0.5">
@@ -1018,17 +1121,108 @@ export default function DashboardAnggota({
               </div>
 
               <form onSubmit={handleCheckoutSubmit} className="space-y-4">
-                {checkoutItem.type === 'UKT' && (
-                  <div>
-                    <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1">Sabuk Terakhir (Otomatis)</label>
-                    <input
-                      type="text"
-                      value={checkoutBelt}
-                      disabled
-                      className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden bg-slate-100 text-slate-400 cursor-not-allowed select-none"
-                    />
-                  </div>
-                )}
+                {checkoutItem.type === 'UKT' && (() => {
+                  const eventItem = events.find(e => e.id === checkoutItem.id);
+                  const parsedCat = parseEventCategory(eventItem?.category || '');
+                  const isAllowed = !parsedCat.allowedBelts || parsedCat.allowedBelts.includes(regBelt);
+
+                  if (!isAllowed) {
+                    return (
+                      <div className="bg-rose-50 border border-rose-100 rounded-xl p-4 text-brand-red font-bold text-center text-xs border-dashed animate-pulse">
+                        ⚠️ Maaf, event ini tidak dibuka untuk tingkat sabuk Anda saat ini ({regBelt}).
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="space-y-3.5 border-t border-slate-100 pt-3">
+                      <p className="text-[10px] font-black uppercase text-brand-red tracking-wider">
+                        Formulir Registrasi Kegiatan
+                      </p>
+                      
+                      <div>
+                        <label className="block text-[9px] font-bold text-slate-500 mb-1">Nama Lengkap *</label>
+                        <input
+                          type="text"
+                          value={regName}
+                          disabled
+                          className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden bg-slate-100 text-slate-400 cursor-not-allowed select-none"
+                          required
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[9px] font-bold text-slate-500 mb-1">Tempat Lahir *</label>
+                          <input
+                            type="text"
+                            value={regBirthPlace}
+                            onChange={e => setRegBirthPlace(e.target.value)}
+                            placeholder="Contoh: Jakarta"
+                            className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white text-slate-800"
+                            required
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[9px] font-bold text-slate-500 mb-1">Tanggal Lahir *</label>
+                          <input
+                            type="date"
+                            value={regBirthDate}
+                            onChange={e => setRegBirthDate(e.target.value)}
+                            className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white text-slate-800"
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-[9px] font-bold text-slate-500 mb-1">Alamat Lengkap *</label>
+                        <textarea
+                          value={regAddress}
+                          onChange={e => setRegAddress(e.target.value)}
+                          placeholder="Masukkan alamat lengkap tinggal..."
+                          className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white text-slate-800 min-h-[60px]"
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[9px] font-bold text-slate-500 mb-1">Unit Latihan / Sekolah *</label>
+                        <input
+                          type="text"
+                          value={regUnit}
+                          onChange={e => setRegUnit(e.target.value)}
+                          placeholder="Contoh: Dojang Pusat / SMP N 1"
+                          className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white text-slate-800"
+                          required
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[9px] font-bold text-slate-500 mb-1">Sabuk Saat Ini</label>
+                          <input
+                            type="text"
+                            value={regBelt}
+                            disabled
+                            className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold bg-slate-100 text-slate-400 cursor-not-allowed select-none"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[9px] font-bold text-slate-500 mb-1">No Telp Orang Tua *</label>
+                          <input
+                            type="tel"
+                            value={regParentPhone}
+                            onChange={e => setRegParentPhone(e.target.value.replace(/\D/g, ''))}
+                            placeholder="Contoh: 0812XXXXXXXX"
+                            className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white text-slate-800"
+                            required
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
 
                 <div className="space-y-1">
                   <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider">

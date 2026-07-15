@@ -8,7 +8,7 @@ import {
   Menu, Eye, EyeOff, Save, Plus, Edit2, Trash2, X,
   TrendingUp, ShoppingBag, AlertCircle, CheckCircle2, Clock,
   Upload, ImageIcon, Calendar, MapPin, Mail, Phone, Award, Copy,
-  ExternalLink, Loader2, FileSpreadsheet, Printer, UserX, UserCheck,
+  ExternalLink, Loader2, FileSpreadsheet, Printer, UserX, UserCheck, UserPlus,
 } from 'lucide-react';
 
 interface DashboardAdminProps {
@@ -33,6 +33,7 @@ type TabType =
   | 'produk-buat'
   | 'produk-edit'
   | 'kategori'
+  | 'kegiatan'
   | 'laporan-anggota'
   | 'laporan-aksesoris'
   | 'laporan-event'
@@ -107,6 +108,19 @@ export default function DashboardAdmin({
   // Custom Belt Dropdown State
   const [beltDropdownOpen, setBeltDropdownOpen] = useState(false);
 
+  // Add Member Modal & Form States
+  const [showAddMemberModal, setShowAddMemberModal] = useState(false);
+  const [newMemberName, setNewMemberName] = useState('');
+  const [newMemberEmail, setNewMemberEmail] = useState('');
+  const [newMemberPhone, setNewMemberPhone] = useState('');
+  const [newMemberGender, setNewMemberGender] = useState<'Laki-laki' | 'Perempuan'>('Laki-laki');
+  const [newMemberAge, setNewMemberAge] = useState<number | ''>('');
+  const [newMemberJenjang, setNewMemberJenjang] = useState<'SD' | 'SMP' | 'SMA/SMK' | 'Umum'>('SD');
+  const [newMemberDojang, setNewMemberDojang] = useState('');
+  const [newMemberBelt, setNewMemberBelt] = useState('Sabuk Putih');
+  const [newMemberPassword, setNewMemberPassword] = useState('');
+  const [beltPricesMap, setBeltPricesMap] = useState<Record<string, number>>({});
+
   // Modal / Interaction states
   const [loading, setLoading] = useState(false);
   const [rejectingTx, setRejectingTx] = useState<Transaction | null>(null);
@@ -136,6 +150,12 @@ export default function DashboardAdmin({
   const [evtPrice, setEvtPrice] = useState<number | string>('');
   const [evtCat, setEvtCat] = useState('');
   const [evtStatus, setEvtStatus] = useState<'Aktif' | 'Nonaktif'>('Aktif');
+
+  // New Event configuration states
+  const [evtType, setEvtType] = useState<'Seminar' | 'UKT' | 'Gasuku' | 'Turnamen' | 'Lainnya'>('Seminar');
+  const [evtCatText, setEvtCatText] = useState('');
+  const [allowedBelts, setAllowedBelts] = useState<string[]>([]);
+  const [useCustomPrices, setUseCustomPrices] = useState(false);
 
   // Profile Form States
   const [adminName, setAdminName] = useState(adminUser.name);
@@ -416,13 +436,18 @@ export default function DashboardAdmin({
   // Event Add/Edit Handle
   const handleSaveEvent = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!evtName || !evtPrice || !evtCat) {
-      toastWarning('Nama, biaya, dan kategori/tingkatan wajib diisi.');
+    const finalCategoryName = evtType === 'Lainnya' ? evtCatText : evtType;
+    if (!evtName || !evtPrice || !finalCategoryName) {
+      toastWarning('Nama, biaya, dan kategori kegiatan wajib diisi.');
       return;
     }
 
     setLoading(true);
     try {
+      const finalCategoryValue = evtType === 'UKT'
+        ? `UKT:::${JSON.stringify({ allowedBelts, beltPrices: beltPricesMap, useCustomPrices })}`
+        : finalCategoryName;
+
       const evtsList = [...events];
       if (editingEvent && editingEvent.id) {
         const idx = evtsList.findIndex(ev => ev.id === editingEvent.id);
@@ -434,7 +459,7 @@ export default function DashboardAdmin({
             date: evtDate || '',
             location: evtLoc || '',
             price: Number(evtPrice.toString().replace(/\D/g, '')),
-            category: evtCat,
+            category: finalCategoryValue,
             status: evtStatus,
           };
         }
@@ -445,13 +470,16 @@ export default function DashboardAdmin({
           date: evtDate || '',
           location: evtLoc || '',
           price: Number(evtPrice.toString().replace(/\D/g, '')),
-          category: evtCat,
+          category: finalCategoryValue,
           status: evtStatus,
         });
       }
 
       await db.saveEvents(evtsList);
       setEditingEvent(null);
+      setBeltPricesMap({});
+      setAllowedBelts([]);
+      setUseCustomPrices(false);
 
       setEvtName('');
       setEvtDate('');
@@ -518,6 +546,66 @@ export default function DashboardAdmin({
     } catch (err) {
       console.error(err);
       toastError('Gagal mengubah sabuk anggota.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAddMember = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newMemberName || !newMemberDojang) {
+      toastWarning('Nama dan Dojang wajib diisi.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const finalEmail = newMemberEmail.trim() || `no-email-${Date.now()}@vdojang.com`;
+      
+      // Check if email already exists (if email is inputted)
+      if (newMemberEmail.trim()) {
+        const existingUsers = await db.getUsers();
+        const exists = existingUsers.some(u => u.email.toLowerCase() === finalEmail.toLowerCase());
+        if (exists) {
+          toastError('Email sudah terdaftar. Silakan gunakan email lain.');
+          setLoading(false);
+          return;
+        }
+      }
+
+      const newUser: User = {
+        id: 'user-' + Date.now(),
+        email: finalEmail,
+        name: newMemberName,
+        role: 'anggota',
+        phone: newMemberPhone || undefined,
+        gender: newMemberGender,
+        age: newMemberAge ? Number(newMemberAge) : undefined,
+        jenjang: newMemberJenjang,
+        dojang: newMemberDojang,
+        belt: newMemberBelt,
+        status: 'Aktif',
+        password: newMemberPassword || '123456',
+      };
+
+      await db.addUser(newUser);
+      await loadAdminData();
+      toastSuccess(`Anggota ${newMemberName} berhasil ditambahkan.`);
+      
+      // Reset form
+      setNewMemberName('');
+      setNewMemberEmail('');
+      setNewMemberPhone('');
+      setNewMemberGender('Laki-laki');
+      setNewMemberAge('');
+      setNewMemberJenjang('SD');
+      setNewMemberDojang('');
+      setNewMemberBelt('Sabuk Putih');
+      setNewMemberPassword('');
+      setShowAddMemberModal(false);
+    } catch (err) {
+      console.error(err);
+      toastError('Gagal menambahkan anggota.');
     } finally {
       setLoading(false);
     }
@@ -939,6 +1027,7 @@ export default function DashboardAdmin({
       case 'laporan-aksesoris': return 'Laporan Penjualan Aksesoris';
       case 'laporan-event': return 'Laporan Event & UKT';
       case 'laporan-keuangan': return 'Laporan Keuangan & Total Keseluruhan';
+      case 'kegiatan': return 'Kelola Kegiatan & Event';
       case 'harga-setting': return 'Konfigurasi Harga & Rekening';
       case 'profile-setting': return 'Ubah Profil Admin';
       default: return 'Admin Portal';
@@ -1076,6 +1165,7 @@ export default function DashboardAdmin({
           {renderSidebarItem('pesanan', 'Verifikasi Bayar', <CreditCard size={16} />, pendingPaymentsCount)}
           {renderSidebarItem('produk', 'Kelola Produk', <Package size={16} />)}
           {renderSidebarItem('kategori', 'Kelola Kategori', <Tag size={16} />)}
+          {renderSidebarItem('kegiatan', 'Kelola Kegiatan', <Calendar size={16} />)}
 
           <div className="h-px bg-slate-800/40 my-2 mx-1" />
           {sidebarOpen && (
@@ -1673,6 +1763,13 @@ export default function DashboardAdmin({
                     >
                       <Printer size={13} />
                       Cetak PDF
+                    </button>
+                    <button
+                      onClick={() => setShowAddMemberModal(true)}
+                      className="inline-flex items-center gap-1.5 px-3 py-2 bg-brand-blue hover:bg-brand-blue-hover text-white border border-brand-blue rounded-xl text-[10px] font-black uppercase tracking-wider transition shadow-xs"
+                    >
+                      <UserPlus size={13} />
+                      Tambah Anggota
                     </button>
                   </div>
                 </div>
@@ -2369,210 +2466,379 @@ export default function DashboardAdmin({
 
             {/* TAB: Harga & Bank */}
             {activeTab === 'harga-setting' && (
-              <div className="space-y-8 bg-white border border-slate-100 p-4 sm:p-6 rounded-2xl shadow-xs animate-fade-in">
-                <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
-                  <form onSubmit={handleSaveSettings} className="bg-slate-50 border border-slate-100 rounded-xl p-5 space-y-4 md:col-span-5 w-full">
-                    <h4 className="font-black text-xs text-brand-blue uppercase border-b border-slate-200 pb-2">Informasi Pembayaran</h4>
-                    
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-500 mb-1">Pendaftaran Baru (Rp)</label>
-                      <input
-                        type="text"
-                        value={formatCurrencyInput(regFee)}
-                        onChange={e => setRegFee(e.target.value.replace(/\D/g, ''))}
-                        placeholder="Contoh: 200.000"
-                        className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white"
-                        required
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-500 mb-1">Nama Bank Penerima</label>
-                      <input
-                        type="text"
-                        value={bankName}
-                        onChange={e => setBankName(e.target.value)}
-                        className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white"
-                        required
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-500 mb-1">Nomor Rekening</label>
-                      <input
-                        type="text"
-                        value={bankAcc}
-                        onChange={e => setBankAcc(e.target.value)}
-                        className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white"
-                        required
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-[10px] font-bold text-slate-500 mb-1">Nama Penerima Rekening</label>
-                      <input
-                        type="text"
-                        value={bankRecipient}
-                        onChange={e => setBankRecipient(e.target.value)}
-                        className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white"
-                        required
-                      />
-                    </div>
-
-                    <button
-                      type="submit"
-                      disabled={loading}
-                      className="w-full py-2.5 bg-brand-blue hover:bg-brand-blue-hover text-white text-[10px] font-black uppercase rounded-lg flex items-center justify-center gap-1.5"
-                    >
-                      {loading ? (
-                        <>
-                          <Loader2 size={12} className="animate-spin" />
-                          <span>Menyimpan...</span>
-                        </>
-                      ) : (
-                        <span>Simpan Pengaturan</span>
-                      )}
-                    </button>
-                </form>
-
-                {/* Manage Events/UKT section */}
-                <div className="md:col-span-7 space-y-4 w-full">
-                  <div className="flex justify-between items-center">
-                    <h4 className="font-black text-[10px] text-slate-400 uppercase tracking-widest">Agenda Turnamen &amp; UKT</h4>
-                    {!editingEvent && (
-                      <button
-                        onClick={() => {
-                          setEditingEvent({ id: '', name: '', date: '', location: '', price: 0, category: 'Semua Tingkatan', status: 'Aktif' });
-                          setEvtName('');
-                          setEvtDate('');
-                          setEvtLoc('');
-                          setEvtPrice('');
-                          setEvtCat('Semua Tingkatan');
-                          setEvtStatus('Aktif');
-                        }}
-                        className="px-2.5 py-1 bg-brand-blue text-white text-[9px] font-black uppercase rounded-lg"
-                      >
-                        + Event
-                      </button>
-                    )}
+              <div className="space-y-8 bg-white border border-slate-100 p-4 sm:p-6 rounded-2xl shadow-xs animate-fade-in max-w-2xl">
+                <form onSubmit={handleSaveSettings} className="bg-slate-50 border border-slate-100 rounded-xl p-5 space-y-4 w-full">
+                  <h4 className="font-black text-xs text-brand-blue uppercase border-b border-slate-200 pb-2">Informasi Pembayaran</h4>
+                  
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 mb-1">Pendaftaran Baru (Rp)</label>
+                    <input
+                      type="text"
+                      value={formatCurrencyInput(regFee)}
+                      onChange={e => setRegFee(e.target.value.replace(/\D/g, ''))}
+                      placeholder="Contoh: 200.000"
+                      className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white"
+                      required
+                    />
                   </div>
 
-                  {editingEvent && (
-                    <form onSubmit={handleSaveEvent} className="bg-slate-50 border border-slate-100 rounded-xl p-4 space-y-3">
-                      <h5 className="font-bold text-[10px] text-brand-blue uppercase">{editingEvent.id ? 'Edit Event' : 'Tambah Event Baru'}</h5>
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 mb-1">Nama Bank Penerima</label>
+                    <input
+                      type="text"
+                      value={bankName}
+                      onChange={e => setBankName(e.target.value)}
+                      className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 mb-1">Nomor Rekening</label>
+                    <input
+                      type="text"
+                      value={bankAcc}
+                      onChange={e => setBankAcc(e.target.value)}
+                      className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold text-slate-500 mb-1">Nama Penerima Rekening</label>
+                    <input
+                      type="text"
+                      value={bankRecipient}
+                      onChange={e => setBankRecipient(e.target.value)}
+                      className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white"
+                      required
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full py-2.5 bg-brand-blue hover:bg-brand-blue-hover text-white text-[10px] font-black uppercase rounded-lg flex items-center justify-center gap-1.5"
+                  >
+                    {loading ? (
+                      <>
+                        <Loader2 size={12} className="animate-spin" />
+                        <span>Menyimpan...</span>
+                      </>
+                    ) : (
+                      <span>Simpan Pengaturan</span>
+                    )}
+                  </button>
+                </form>
+              </div>
+            )}
+
+            {/* TAB: Kelola Kegiatan */}
+            {activeTab === 'kegiatan' && (
+              <div className="space-y-8 bg-white border border-slate-100 p-4 sm:p-6 rounded-2xl shadow-xs animate-fade-in">
+                <div className="flex justify-between items-center border-b border-slate-100 pb-4">
+                  <div>
+                    <h3 className="text-lg font-black text-slate-800">Kelola Kegiatan &amp; Event</h3>
+                    <p className="text-slate-400 text-xs mt-0.5">Kelola turnamen, UKT (ujian kenaikan tingkat), seminar, dan kegiatan lainnya.</p>
+                  </div>
+                  {!editingEvent && (
+                    <button
+                      onClick={() => {
+                        setEditingEvent({ id: '', name: '', date: '', location: '', price: 0, category: 'Seminar', status: 'Aktif' });
+                        setEvtName('');
+                        setEvtDate('');
+                        setEvtLoc('');
+                        setEvtPrice('');
+                        setEvtType('Seminar');
+                        setEvtCatText('');
+                        setEvtStatus('Aktif');
+                        setAllowedBelts(['Sabuk Putih', 'Sabuk Kuning', 'Sabuk Hijau', 'Sabuk Biru', 'Sabuk Merah', 'Sabuk Hitam', 'Poom 1', 'Poom 2', 'Poom 3', 'Dan 1', 'Dan 2', 'Dan 3', 'Dan 4']);
+                        setUseCustomPrices(false);
+                        setBeltPricesMap({});
+                      }}
+                      className="px-4 py-2 bg-brand-blue hover:bg-brand-blue-hover text-white text-xs font-black uppercase tracking-wider rounded-xl transition flex items-center gap-1.5 shadow-md shadow-brand-blue/10"
+                    >
+                      <Plus size={14} />
+                      Tambah Kegiatan Baru
+                    </button>
+                  )}
+                </div>
+
+                {editingEvent && (
+                  <form onSubmit={handleSaveEvent} className="bg-slate-50 border border-slate-100 rounded-2xl p-5 space-y-4 max-w-4xl">
+                    <div className="flex justify-between items-center border-b border-slate-200/60 pb-2">
+                      <h4 className="font-extrabold text-sm text-slate-800 uppercase tracking-wide">
+                        {editingEvent.id ? '✏️ Edit Detail Kegiatan' : '➕ Tambah Kegiatan Baru'}
+                      </h4>
+                      <button type="button" onClick={() => setEditingEvent(null)} className="text-slate-400 hover:text-slate-600 font-bold">✕</button>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-[9px] font-bold text-slate-500 mb-0.5">Nama Kegiatan</label>
+                        <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1">Nama Kegiatan *</label>
                         <input
                           type="text"
                           value={evtName}
                           onChange={e => setEvtName(e.target.value)}
-                          className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white"
+                          className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white text-slate-800"
+                          placeholder="Contoh: Ujian Kenaikan Tingkat (UKT) Periode I"
                           required
                         />
                       </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-[9px] font-bold text-slate-500 mb-0.5">Tanggal</label>
-                          <input
-                            type="date"
-                            value={evtDate}
-                            onChange={e => setEvtDate(e.target.value)}
-                            className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-[9px] font-bold text-slate-500 mb-0.5">Kategori Sabuk/Umur</label>
-                          <input
-                            type="text"
-                            value={evtCat}
-                            onChange={e => setEvtCat(e.target.value)}
-                            className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white"
-                            required
-                          />
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-3 gap-3">
-                        <div className="col-span-1">
-                          <label className="block text-[9px] font-bold text-slate-500 mb-0.5">Lokasi</label>
-                          <input
-                            type="text"
-                            value={evtLoc}
-                            onChange={e => setEvtLoc(e.target.value)}
-                            className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white"
-                          />
-                        </div>
-                        <div className="col-span-1">
-                          <label className="block text-[9px] font-bold text-slate-500 mb-0.5">Biaya (Rp)</label>
-                          <input
-                            type="text"
-                            value={formatCurrencyInput(evtPrice)}
-                            onChange={e => setEvtPrice(e.target.value.replace(/\D/g, ''))}
-                            placeholder="Contoh: 150.000"
-                            className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white"
-                            required
-                          />
-                        </div>
-                        <div className="col-span-1">
-                          <label className="block text-[9px] font-bold text-slate-500 mb-0.5">Status</label>
-                          <select
-                            value={evtStatus}
-                            onChange={e => setEvtStatus(e.target.value as 'Aktif' | 'Nonaktif')}
-                            className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white"
-                          >
-                            <option value="Aktif">Aktif</option>
-                            <option value="Nonaktif">Nonaktif</option>
-                          </select>
-                        </div>
-                      </div>
 
-                      <div className="flex gap-2">
-                        <button
-                          type="submit"
-                          disabled={loading}
-                          className="px-3 py-1.5 bg-brand-blue text-white text-[9px] font-bold rounded-lg uppercase inline-flex items-center gap-1"
+                      <div>
+                        <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1">Jenis / Kategori Event *</label>
+                        <select
+                          value={evtType}
+                          onChange={e => {
+                            const val = e.target.value;
+                            setEvtType(val as any);
+                            if (val === 'UKT') {
+                              setAllowedBelts(['Sabuk Putih', 'Sabuk Kuning', 'Sabuk Hijau', 'Sabuk Biru', 'Sabuk Merah', 'Sabuk Hitam', 'Poom 1', 'Poom 2', 'Poom 3', 'Dan 1', 'Dan 2', 'Dan 3', 'Dan 4']);
+                            }
+                          }}
+                          className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white cursor-pointer text-slate-800"
+                          required
                         >
-                          {loading ? (
-                            <>
-                              <Loader2 size={10} className="animate-spin" />
-                              <span>Menyimpan...</span>
-                            </>
-                          ) : (
-                            <span>Simpan</span>
-                          )}
-                        </button>
-                        <button type="button" onClick={() => setEditingEvent(null)} className="px-3 py-1.5 border border-slate-200 text-[9px] font-bold rounded-lg uppercase">Batal</button>
+                          <option value="Seminar">🎓 Seminar / Workshop</option>
+                          <option value="UKT">🥋 UKT (Ujian Kenaikan Tingkat)</option>
+                          <option value="Gasuku">🏕️ Gasuku / Latihan Gabungan</option>
+                          <option value="Turnamen">🏆 Turnamen / Kejuaraan</option>
+                          <option value="Lainnya">⚙️ Lainnya (Kustom)</option>
+                        </select>
                       </div>
-                    </form>
-                  )}
+                    </div>
 
-                  <div className="border border-slate-100 rounded-xl overflow-x-auto bg-white">
-                    <table className="w-full text-left text-xs border-collapse min-w-[500px]">
-                      <thead>
-                        <tr className="bg-slate-50 text-slate-500 font-extrabold border-b border-slate-100">
-                          <th className="p-3">Nama Event</th>
-                          <th className="p-3">Biaya</th>
-                          <th className="p-3 text-right">Aksi</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {events.map(ev => (
-                          <tr key={ev.id} className="border-b border-slate-100 hover:bg-slate-50/20 transition font-semibold text-slate-650">
-                            <td className="p-3">
-                              <div className="flex flex-col">
-                                <div className="flex items-center gap-2">
-                                  <span className="font-bold text-slate-800">{ev.name}</span>
-                                  <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase ${
-                                    ev.status === 'Nonaktif' ? 'bg-rose-50 text-brand-red border border-rose-100' : 'bg-emerald-50 text-emerald-700 border border-emerald-100'
-                                  }`}>
-                                    {ev.status || 'Aktif'}
-                                  </span>
+                    {evtType === 'Lainnya' && (
+                      <div className="animate-fade-in">
+                        <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1">Nama Kategori Kustom *</label>
+                        <input
+                          type="text"
+                          value={evtCatText}
+                          onChange={e => setEvtCatText(e.target.value)}
+                          className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white text-slate-800"
+                          placeholder="Masukkan nama kategori kustom..."
+                          required
+                        />
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1">Tanggal Pelaksanaan *</label>
+                        <input
+                          type="date"
+                          value={evtDate}
+                          onChange={e => setEvtDate(e.target.value)}
+                          className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white text-slate-800 cursor-pointer"
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1">Lokasi Pelaksanaan *</label>
+                        <input
+                          type="text"
+                          value={evtLoc}
+                          onChange={e => setEvtLoc(e.target.value)}
+                          className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white text-slate-800"
+                          placeholder="Contoh: GOR Basket V-Dojang"
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1">Biaya Dasar (Rp) *</label>
+                        <input
+                          type="text"
+                          value={formatCurrencyInput(evtPrice)}
+                          onChange={e => setEvtPrice(e.target.value.replace(/\D/g, ''))}
+                          placeholder="Contoh: 150.000"
+                          className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white text-slate-800"
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1">Status Keaktifan *</label>
+                        <select
+                          value={evtStatus}
+                          onChange={e => setEvtStatus(e.target.value as 'Aktif' | 'Nonaktif')}
+                          className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white cursor-pointer text-slate-800"
+                          required
+                        >
+                          <option value="Aktif">🟢 Aktif (Bisa Diikuti)</option>
+                          <option value="Nonaktif">🔴 Nonaktif (Dikunci)</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* UKT-SPECIFIC BI-PRICING AND ELIGIBILITY */}
+                    {evtType === 'UKT' && (
+                      <div className="border border-slate-200/80 rounded-2xl p-5 bg-white space-y-4 animate-fade-in shadow-xs">
+                        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center border-b border-slate-100 pb-3 gap-3">
+                          <div>
+                            <h5 className="font-extrabold text-xs text-slate-800 uppercase tracking-wide">Konfigurasi Peserta &amp; Biaya UKT</h5>
+                            <p className="text-[10px] text-slate-450 mt-0.5">Tentukan tingkatan sabuk mana saja yang diijinkan mendaftar dan atur harga spesifiknya.</p>
+                          </div>
+                          
+                          <label className="inline-flex items-center gap-2 cursor-pointer select-none shrink-0 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 hover:bg-slate-100 transition">
+                            <input
+                              type="checkbox"
+                              checked={useCustomPrices}
+                              onChange={e => setUseCustomPrices(e.target.checked)}
+                              className="w-3.5 h-3.5 rounded border-slate-300 text-brand-blue focus:ring-brand-blue"
+                            />
+                            <span className="text-[10px] font-black text-slate-700 uppercase">Harga Khusus Sabuk</span>
+                          </label>
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-3">Pilih Tingkat Sabuk &amp; Biaya:</label>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                            {[
+                              'Sabuk Putih', 'Sabuk Kuning', 'Sabuk Hijau', 'Sabuk Biru', 'Sabuk Merah', 'Sabuk Hitam',
+                              'Poom 1', 'Poom 2', 'Poom 3', 'Dan 1', 'Dan 2', 'Dan 3', 'Dan 4'
+                            ].map(beltName => {
+                              const isAllowed = allowedBelts.includes(beltName);
+                              return (
+                                <div key={beltName} className={`border rounded-xl p-3 flex flex-col justify-between transition-all duration-200 ${isAllowed ? 'bg-slate-50/50 border-slate-200' : 'bg-slate-100/40 border-slate-200/50 opacity-60'}`}>
+                                  <label className="inline-flex items-center gap-2.5 cursor-pointer select-none">
+                                    <input
+                                      type="checkbox"
+                                      checked={isAllowed}
+                                      onChange={e => {
+                                        if (e.target.checked) {
+                                          setAllowedBelts(prev => [...prev, beltName]);
+                                        } else {
+                                          setAllowedBelts(prev => prev.filter(b => b !== beltName));
+                                        }
+                                      }}
+                                      className="w-3.5 h-3.5 rounded border-slate-300 text-brand-blue focus:ring-brand-blue"
+                                    />
+                                    <span className="text-xs font-bold text-slate-800">{beltName}</span>
+                                  </label>
+
+                                  {isAllowed && useCustomPrices && (
+                                    <div className="mt-2.5 animate-fade-in">
+                                      <input
+                                        type="text"
+                                        placeholder={`Dasar: Rp ${evtPrice ? formatCurrencyInput(evtPrice) : '0'}`}
+                                        value={beltPricesMap[beltName] ? formatCurrencyInput(beltPricesMap[beltName]) : ''}
+                                        onChange={e => {
+                                          const val = e.target.value.replace(/\D/g, '');
+                                          setBeltPricesMap(prev => ({
+                                            ...prev,
+                                            [beltName]: val ? Number(val) : 0
+                                          }));
+                                        }}
+                                        className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white text-slate-800 focus:border-brand-blue transition"
+                                      />
+                                    </div>
+                                  )}
+                                  {isAllowed && !useCustomPrices && (
+                                    <div className="mt-2 text-[10px] font-semibold text-slate-400 italic pl-6">
+                                      Biaya: Rp {evtPrice ? formatCurrencyInput(evtPrice) : '0'}
+                                    </div>
+                                  )}
+                                  {!isAllowed && (
+                                    <div className="mt-2 text-[10px] font-semibold text-slate-400 italic pl-6">
+                                      ❌ Tidak Dapat Ikut
+                                    </div>
+                                  )}
                                 </div>
-                                <span className="text-[9px] text-slate-400 mt-0.5">📅 {ev.date || '--'} | 📍 {ev.location || '--'}</span>
-                              </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                    )}
 
+                    <div className="flex gap-2.5 pt-2">
+                      <button
+                        type="submit"
+                        disabled={loading}
+                        className="px-5 py-2.5 bg-brand-blue hover:bg-brand-blue-hover text-white text-xs font-black uppercase tracking-wider rounded-xl transition flex items-center gap-1.5 shadow-md shadow-brand-blue/10"
+                      >
+                        {loading ? (
+                          <>
+                            <Loader2 size={12} className="animate-spin" />
+                            <span>Menyimpan...</span>
+                          </>
+                        ) : (
+                          <span>Simpan Kegiatan</span>
+                        )}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditingEvent(null)}
+                        className="px-5 py-2.5 border border-slate-200 hover:bg-slate-50 text-slate-600 hover:text-slate-850 text-xs font-black uppercase tracking-wider rounded-xl transition"
+                      >
+                        Batal
+                      </button>
+                    </div>
+                  </form>
+                )}
+
+                <div className="border border-slate-100 rounded-2xl overflow-hidden bg-white shadow-xs">
+                  <table className="w-full text-left text-xs border-collapse min-w-[600px]">
+                    <thead>
+                      <tr className="bg-slate-50 text-slate-500 font-extrabold border-b border-slate-100 uppercase tracking-wider text-[9px]">
+                        <th className="p-4 pl-6">Nama Event / Kegiatan</th>
+                        <th className="p-4">Jenis Kategori</th>
+                        <th className="p-4">Biaya Dasar</th>
+                        <th className="p-4 text-center">Status</th>
+                        <th className="p-4 pr-6 text-right">Aksi</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {events.map(ev => {
+                        let catDisplay = ev.category || 'Seminar';
+                        let pricingTypeDisplay = 'Flat (Sama Rata)';
+                        if (ev.category.includes(':::')) {
+                          const parts = ev.category.split(':::');
+                          catDisplay = parts[0];
+                          try {
+                            const parsed = JSON.parse(parts[1]);
+                            if (parsed && typeof parsed === 'object') {
+                              pricingTypeDisplay = parsed.useCustomPrices ? 'Harga Khusus Sabuk' : 'Flat (Sama Rata)';
+                            } else {
+                              pricingTypeDisplay = 'Harga Khusus Sabuk';
+                            }
+                          } catch {
+                            pricingTypeDisplay = 'Harga Khusus Sabuk';
+                          }
+                        }
+                        
+                        return (
+                          <tr key={ev.id} className="border-b border-slate-100 hover:bg-slate-50/20 transition font-semibold text-slate-600">
+                            <td className="p-4 pl-6">
+                              <div className="flex flex-col">
+                                <span className="font-bold text-slate-855 text-sm leading-snug">{ev.name}</span>
+                                <span className="text-[10px] text-slate-400 mt-1 font-medium">
+                                  📅 {ev.date || '--'} &nbsp;|&nbsp; 📍 {ev.location || '--'}
+                                </span>
+                              </div>
                             </td>
-                            <td className="p-3 text-brand-blue font-bold">Rp {ev.price.toLocaleString('id-ID')}</td>
-                            <td className="p-3 text-right space-x-2">
+                            <td className="p-4">
+                              <div className="flex flex-col">
+                                <span className="text-slate-800 font-bold uppercase text-[10px] tracking-wider">{catDisplay}</span>
+                                <span className="text-[9px] text-slate-450 mt-0.5">{pricingTypeDisplay}</span>
+                              </div>
+                            </td>
+                            <td className="p-4 text-brand-blue font-bold text-sm">
+                              Rp {ev.price.toLocaleString('id-ID')}
+                            </td>
+                            <td className="p-4 text-center">
+                              <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase border ${
+                                ev.status === 'Nonaktif' ? 'bg-rose-50 text-brand-red border-rose-100' : 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                              }`}>
+                                {ev.status || 'Aktif'}
+                              </span>
+                            </td>
+                            <td className="p-4 pr-6 text-right space-x-3">
                               <button
                                 onClick={() => {
                                   setEditingEvent(ev);
@@ -2580,31 +2846,69 @@ export default function DashboardAdmin({
                                   setEvtDate(ev.date);
                                   setEvtLoc(ev.location);
                                   setEvtPrice(ev.price);
-                                  setEvtCat(ev.category);
                                   setEvtStatus(ev.status || 'Aktif');
+                                  
+                                  const catVal = ev.category || '';
+                                  if (catVal.includes(':::')) {
+                                    const parts = catVal.split(':::');
+                                    setEvtType('UKT');
+                                    setEvtCatText('');
+                                    try {
+                                      const parsed = JSON.parse(parts[1]);
+                                      if (parsed && typeof parsed === 'object') {
+                                        if (parsed.allowedBelts !== undefined) {
+                                          setAllowedBelts(parsed.allowedBelts || []);
+                                          setBeltPricesMap(parsed.beltPrices || {});
+                                          setUseCustomPrices(!!parsed.useCustomPrices);
+                                        } else {
+                                          setAllowedBelts(['Sabuk Putih', 'Sabuk Kuning', 'Sabuk Hijau', 'Sabuk Biru', 'Sabuk Merah', 'Sabuk Hitam', 'Poom 1', 'Poom 2', 'Poom 3', 'Dan 1', 'Dan 2', 'Dan 3', 'Dan 4']);
+                                          setBeltPricesMap(parsed || {});
+                                          setUseCustomPrices(true);
+                                        }
+                                      } else {
+                                        setAllowedBelts(['Sabuk Putih', 'Sabuk Kuning', 'Sabuk Hijau', 'Sabuk Biru', 'Sabuk Merah', 'Sabuk Hitam', 'Poom 1', 'Poom 2', 'Poom 3', 'Dan 1', 'Dan 2', 'Dan 3', 'Dan 4']);
+                                        setBeltPricesMap({});
+                                        setUseCustomPrices(false);
+                                      }
+                                    } catch (err) {
+                                      setAllowedBelts(['Sabuk Putih', 'Sabuk Kuning', 'Sabuk Hijau', 'Sabuk Biru', 'Sabuk Merah', 'Sabuk Hitam', 'Poom 1', 'Poom 2', 'Poom 3', 'Dan 1', 'Dan 2', 'Dan 3', 'Dan 4']);
+                                      setBeltPricesMap({});
+                                      setUseCustomPrices(false);
+                                    }
+                                  } else {
+                                    const knownTypes = ['Seminar', 'Gasuku', 'Turnamen'];
+                                    if (knownTypes.includes(catVal)) {
+                                      setEvtType(catVal as any);
+                                      setEvtCatText('');
+                                    } else {
+                                      setEvtType('Lainnya');
+                                      setEvtCatText(catVal);
+                                    }
+                                    setAllowedBelts(['Sabuk Putih', 'Sabuk Kuning', 'Sabuk Hijau', 'Sabuk Biru', 'Sabuk Merah', 'Sabuk Hitam', 'Poom 1', 'Poom 2', 'Poom 3', 'Dan 1', 'Dan 2', 'Dan 3', 'Dan 4']);
+                                    setBeltPricesMap({});
+                                    setUseCustomPrices(false);
+                                  }
                                 }}
-                                className="text-[9px] font-black text-brand-blue uppercase hover:underline"
+                                className="text-[10px] font-black text-brand-blue uppercase hover:underline"
                               >
                                 Edit
                               </button>
                               <button
                                 onClick={() => handleDeleteEvent(ev.id)}
-                                className="text-[9px] font-black text-brand-red uppercase hover:underline"
+                                className="text-[10px] font-black text-brand-red uppercase hover:underline"
                               >
                                 Hapus
                               </button>
                             </td>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
               </div>
-            </div>
-          )}
-
-          {/* TAB: Profil Admin Setting */}
+            )}
+{/* TAB: Profil Admin Setting */}
           {activeTab === 'profile-setting' && (
             <div className="space-y-6 bg-white border border-slate-100 p-4 sm:p-6 rounded-2xl shadow-xs animate-fade-in max-w-md">
               <form onSubmit={handleSaveProfile} className="space-y-4 w-full">
@@ -3006,6 +3310,169 @@ export default function DashboardAdmin({
                 Tutup
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ADD MEMBER MODAL */}
+      {showAddMemberModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 animate-fade-in" onClick={() => setShowAddMemberModal(false)}>
+          <div className="bg-white rounded-3xl border border-slate-100 max-w-lg w-full overflow-hidden shadow-2xl animate-scale-up" onClick={e => e.stopPropagation()}>
+            <div className="border-b border-slate-100 p-6 flex justify-between items-center bg-slate-50/50">
+              <div>
+                <h3 className="font-black text-sm text-slate-800 font-sans">Tambah Anggota Baru</h3>
+                <p className="text-[9px] text-slate-400 uppercase tracking-widest mt-0.5 font-sans">Input Data Anggota Mandiri / Anggota Lama</p>
+              </div>
+              <button onClick={() => setShowAddMemberModal(false)} className="text-slate-400 hover:text-slate-650 font-bold transition">
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleAddMember} className="p-6 space-y-4 text-xs font-semibold text-slate-650 max-h-[70vh] overflow-y-auto scrollbar-thin">
+              <div>
+                <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1">Nama Lengkap Anggota *</label>
+                <input
+                  type="text"
+                  value={newMemberName}
+                  onChange={e => setNewMemberName(e.target.value)}
+                  placeholder="Nama Lengkap Anggota..."
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white text-slate-800"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3.5">
+                <div>
+                  <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1">Alamat Email (Opsional)</label>
+                  <input
+                    type="email"
+                    value={newMemberEmail}
+                    onChange={e => setNewMemberEmail(e.target.value)}
+                    placeholder="Contoh: email@domain.com"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white text-slate-800"
+                  />
+                  <p className="text-[9px] text-slate-400 mt-1">Kosongkan untuk anggota lama tanpa email.</p>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1">Nomor WhatsApp / HP</label>
+                  <input
+                    type="tel"
+                    value={newMemberPhone}
+                    onChange={e => setNewMemberPhone(e.target.value.replace(/\D/g, ''))}
+                    placeholder="Contoh: 081234567890"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white text-slate-800"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3.5">
+                <div>
+                  <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1">Jenis Kelamin</label>
+                  <select
+                    value={newMemberGender}
+                    onChange={e => setNewMemberGender(e.target.value as 'Laki-laki' | 'Perempuan')}
+                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white text-slate-800 cursor-pointer"
+                  >
+                    <option value="Laki-laki">♂️ Laki-laki</option>
+                    <option value="Perempuan">♀️ Perempuan</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1">Umur (Tahun)</label>
+                  <input
+                    type="number"
+                    value={newMemberAge}
+                    onChange={e => setNewMemberAge(e.target.value === '' ? '' : Number(e.target.value))}
+                    placeholder="Contoh: 17"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white text-slate-800"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1">Jenjang Pendidikan</label>
+                  <select
+                    value={newMemberJenjang}
+                    onChange={e => setNewMemberJenjang(e.target.value as any)}
+                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white text-slate-800 cursor-pointer"
+                  >
+                    <option value="SD">SD</option>
+                    <option value="SMP">SMP</option>
+                    <option value="SMA/SMK">SMA/SMK</option>
+                    <option value="Umum">Umum</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3.5">
+                <div>
+                  <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1">Dojang / Cabang Latihan *</label>
+                  <input
+                    type="text"
+                    value={newMemberDojang}
+                    onChange={e => setNewMemberDojang(e.target.value)}
+                    placeholder="Contoh: Dojang Pusat"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white text-slate-800"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1">Sabuk Saat Ini</label>
+                  <select
+                    value={newMemberBelt}
+                    onChange={e => setNewMemberBelt(e.target.value)}
+                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white text-slate-800 cursor-pointer"
+                  >
+                    <option value="Sabuk Putih">Sabuk Putih</option>
+                    <option value="Sabuk Kuning">Sabuk Kuning</option>
+                    <option value="Sabuk Hijau">Sabuk Hijau</option>
+                    <option value="Sabuk Biru">Sabuk Biru</option>
+                    <option value="Sabuk Merah">Sabuk Merah</option>
+                    <option value="Sabuk Hitam">Sabuk Hitam</option>
+                    <option value="Poom 1">Poom 1</option>
+                    <option value="Poom 2">Poom 2</option>
+                    <option value="Poom 3">Poom 3</option>
+                    <option value="Dan 1">Dan 1</option>
+                    <option value="Dan 2">Dan 2</option>
+                    <option value="Dan 3">Dan 3</option>
+                    <option value="Dan 4">Dan 4</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1">Kata Sandi Akun (Opsional)</label>
+                <input
+                  type="password"
+                  value={newMemberPassword}
+                  onChange={e => setNewMemberPassword(e.target.value)}
+                  placeholder="Default sandi: 123456"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white text-slate-800"
+                />
+              </div>
+
+              <div className="pt-4 border-t border-slate-100 flex justify-end gap-3 bg-slate-50/50 -mx-6 -mb-6 p-4">
+                <button
+                  type="button"
+                  onClick={() => setShowAddMemberModal(false)}
+                  className="px-5 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-black uppercase rounded-xl transition font-sans border border-slate-200"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="px-5 py-2.5 bg-brand-blue hover:bg-brand-blue-hover text-white text-xs font-black uppercase rounded-xl transition font-sans shadow-xs inline-flex items-center gap-1.5"
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 size={12} className="animate-spin" />
+                      <span>Menambahkan...</span>
+                    </>
+                  ) : (
+                    <span>Tambah Anggota</span>
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
