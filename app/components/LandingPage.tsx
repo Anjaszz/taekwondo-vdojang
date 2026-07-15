@@ -624,7 +624,9 @@ Formulir Registrasi:
                     <div className="flex justify-between items-center mb-4">
                       <div className="flex items-center gap-1.5 bg-brand-blue/8 text-brand-blue px-2.5 py-1 rounded-full">
                         <Star size={10} />
-                        <span className="text-[10px] font-black uppercase">{evt.category}</span>
+                        <span className="text-[10px] font-black uppercase">
+                          {evt.category.includes(':::') ? evt.category.split(':::')[0] : evt.category}
+                        </span>
                       </div>
                       <div className="flex items-center gap-1 text-brand-blue">
                         <Ticket size={13} />

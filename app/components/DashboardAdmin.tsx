@@ -8,7 +8,7 @@ import {
   Menu, Eye, EyeOff, Save, Plus, Edit2, Trash2, X,
   TrendingUp, ShoppingBag, AlertCircle, CheckCircle2, Clock,
   Upload, ImageIcon, Calendar, MapPin, Mail, Phone, Award, Copy,
-  ExternalLink, Loader2, FileSpreadsheet, Printer, UserX, UserCheck, UserPlus,
+  ExternalLink, Loader2, FileSpreadsheet, Printer, UserX, UserCheck, UserPlus, Receipt,
 } from 'lucide-react';
 
 interface DashboardAdminProps {
@@ -34,6 +34,7 @@ type TabType =
   | 'produk-edit'
   | 'kategori'
   | 'kegiatan'
+  | 'sabuk'
   | 'laporan-anggota'
   | 'laporan-aksesoris'
   | 'laporan-event'
@@ -84,6 +85,7 @@ export default function DashboardAdmin({
   const [filterMemberName, setFilterMemberName] = useState('');
   const [filterMemberBelt, setFilterMemberBelt] = useState('Semua');
   const [filterMemberStatus, setFilterMemberStatus] = useState('Semua');
+  const [filterMemberDojang, setFilterMemberDojang] = useState('Semua');
 
   const [filterAccMonth, setFilterAccMonth] = useState('Semua');
   const [filterAccYear, setFilterAccYear] = useState('Semua');
@@ -110,6 +112,7 @@ export default function DashboardAdmin({
 
   // Add Member Modal & Form States
   const [showAddMemberModal, setShowAddMemberModal] = useState(false);
+  const [showPaymentLogModal, setShowPaymentLogModal] = useState(false);
   const [newMemberName, setNewMemberName] = useState('');
   const [newMemberEmail, setNewMemberEmail] = useState('');
   const [newMemberPhone, setNewMemberPhone] = useState('');
@@ -120,6 +123,19 @@ export default function DashboardAdmin({
   const [newMemberBelt, setNewMemberBelt] = useState('Sabuk Putih');
   const [newMemberPassword, setNewMemberPassword] = useState('');
   const [beltPricesMap, setBeltPricesMap] = useState<Record<string, number>>({});
+
+  // Edit Member Modal & Form States
+  const [editingMember, setEditingMember] = useState<User | null>(null);
+  const [editMemberName, setEditMemberName] = useState('');
+  const [editMemberEmail, setEditMemberEmail] = useState('');
+  const [editMemberPhone, setEditMemberPhone] = useState('');
+  const [editMemberGender, setEditMemberGender] = useState<'Laki-laki' | 'Perempuan'>('Laki-laki');
+  const [editMemberAge, setEditMemberAge] = useState<number | ''>('');
+  const [editMemberJenjang, setEditMemberJenjang] = useState<'SD' | 'SMP' | 'SMA/SMK' | 'Umum'>('SD');
+  const [editMemberDojang, setEditMemberDojang] = useState('');
+  const [editMemberBelt, setEditMemberBelt] = useState('Sabuk Putih');
+  const [editMemberPassword, setEditMemberPassword] = useState('');
+  const [editMemberStatus, setEditMemberStatus] = useState<'Aktif' | 'Nonaktif'>('Aktif');
 
   // Modal / Interaction states
   const [loading, setLoading] = useState(false);
@@ -157,6 +173,12 @@ export default function DashboardAdmin({
   const [allowedBelts, setAllowedBelts] = useState<string[]>([]);
   const [useCustomPrices, setUseCustomPrices] = useState(false);
 
+  // Belts dynamic CRUD states
+  const [belts, setBelts] = useState<string[]>([]);
+  const [newBeltName, setNewBeltName] = useState('');
+  const [editingBeltIdx, setEditingBeltIdx] = useState<number | null>(null);
+  const [editingBeltName, setEditingBeltName] = useState('');
+
   // Profile Form States
   const [adminName, setAdminName] = useState(adminUser.name);
   const [adminEmail, setAdminEmail] = useState(adminUser.email);
@@ -171,13 +193,14 @@ export default function DashboardAdmin({
 
   // Load Database Values
   const loadAdminData = async () => {
-    const [us, txs, prods, cats, evts, setts] = await Promise.all([
+    const [us, txs, prods, cats, evts, setts, blts] = await Promise.all([
       db.getUsers(),
       db.getTransactions(),
       db.getProducts(),
       db.getCategories(),
       db.getEvents(),
       db.getSettings(),
+      db.getBelts(),
     ]);
 
     setUsers(us);
@@ -186,6 +209,7 @@ export default function DashboardAdmin({
     setCategories(cats);
     setEvents(evts);
     setSettings(setts);
+    setBelts(blts || []);
 
     if (cats.length > 0 && !prodCatId) {
       setProdCatId(cats[0].id);
@@ -434,6 +458,103 @@ export default function DashboardAdmin({
   };
 
   // Event Add/Edit Handle
+  // Belt CRUD Handlers
+  const handleAddBelt = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newBeltName.trim()) return;
+    const name = newBeltName.trim();
+    if (belts.includes(name)) {
+      toastWarning('Nama sabuk sudah ada.');
+      return;
+    }
+    setLoading(true);
+    try {
+      const updated = [...belts, name];
+      console.log('[handleAddBelt] Menyimpan sabuk ke DB:', updated);
+      await db.saveBelts(updated);
+      console.log('[handleAddBelt] Berhasil disimpan ke DB.');
+      setBelts(updated);
+      setNewBeltName('');
+      toastSuccess('Sabuk berhasil ditambahkan.');
+    } catch (err) {
+      console.error('[handleAddBelt] ERROR:', err);
+      toastError('Gagal menambahkan sabuk: ' + (err instanceof Error ? err.message : String(err)));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEditBeltSubmit = async (idx: number) => {
+    if (!editingBeltName.trim()) return;
+    const newName = editingBeltName.trim();
+    if (belts[idx] === newName) {
+      setEditingBeltIdx(null);
+      return;
+    }
+    if (belts.includes(newName)) {
+      toastWarning('Nama sabuk sudah digunakan.');
+      return;
+    }
+    setLoading(true);
+    try {
+      const updated = [...belts];
+      updated[idx] = newName;
+      await db.saveBelts(updated);
+      setBelts(updated);
+      setEditingBeltIdx(null);
+      toastSuccess('Nama sabuk berhasil diubah.');
+    } catch (err) {
+      console.error(err);
+      toastError('Gagal mengubah nama sabuk.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteBelt = async (idx: number) => {
+    const beltToDelete = belts[idx];
+    const ok = await confirmModal(
+      'Hapus Sabuk',
+      `Apakah Anda yakin ingin menghapus sabuk "${beltToDelete}"? Anggota yang menggunakan sabuk ini tetap memiliki datanya, tetapi tidak akan muncul sebagai pilihan tingkat sabuk baru.`,
+      { confirmLabel: 'Hapus', variant: 'danger' }
+    );
+    if (!ok) return;
+
+    setLoading(true);
+    try {
+      const updated = belts.filter((_, i) => i !== idx);
+      await db.saveBelts(updated);
+      setBelts(updated);
+      toastSuccess('Sabuk berhasil dihapus.');
+    } catch (err) {
+      console.error(err);
+      toastError('Gagal menghapus sabuk.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleMoveBelt = async (idx: number, direction: 'up' | 'down') => {
+    const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (targetIdx < 0 || targetIdx >= belts.length) return;
+
+    setLoading(true);
+    try {
+      const updated = [...belts];
+      const temp = updated[idx];
+      updated[idx] = updated[targetIdx];
+      updated[targetIdx] = temp;
+      await db.saveBelts(updated);
+      setBelts(updated);
+      toastSuccess('Urutan sabuk berhasil diubah.');
+    } catch (err) {
+      console.error(err);
+      toastError('Gagal mengubah urutan sabuk.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSaveEvent = async (e: React.FormEvent) => {
     e.preventDefault();
     const finalCategoryName = evtType === 'Lainnya' ? evtCatText : evtType;
@@ -611,6 +732,93 @@ export default function DashboardAdmin({
     }
   };
 
+  const handleStartEditMember = (member: User) => {
+    setEditingMember(member);
+    setEditMemberName(member.name);
+    setEditMemberEmail(member.email.startsWith('no-email-') ? '' : member.email);
+    setEditMemberPhone(member.phone || '');
+    setEditMemberGender(member.gender || 'Laki-laki');
+    setEditMemberAge(member.age !== undefined && member.age !== null ? member.age : '');
+    setEditMemberJenjang(member.jenjang || 'SD');
+    setEditMemberDojang(member.dojang || '');
+    setEditMemberBelt(member.belt || 'Sabuk Putih');
+    setEditMemberPassword(member.password || '');
+    setEditMemberStatus(member.status || 'Aktif');
+  };
+
+  const handleSaveEditMember = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingMember) return;
+    if (!editMemberName || !editMemberDojang) {
+      toastWarning('Nama dan Dojang wajib diisi.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const finalEmail = editMemberEmail.trim() || editingMember.email || `no-email-${Date.now()}@vdojang.com`;
+
+      // Check if email already exists and was modified
+      if (editMemberEmail.trim() && editMemberEmail.trim().toLowerCase() !== editingMember.email.toLowerCase()) {
+        const existingUsers = await db.getUsers();
+        const exists = existingUsers.some(u => u.email.toLowerCase() === editMemberEmail.trim().toLowerCase());
+        if (exists) {
+          toastError('Email sudah terdaftar. Silakan gunakan email lain.');
+          setLoading(false);
+          return;
+        }
+      }
+
+      const updatedUser: User = {
+        ...editingMember,
+        email: finalEmail,
+        name: editMemberName,
+        phone: editMemberPhone || undefined,
+        gender: editMemberGender,
+        age: editMemberAge ? Number(editMemberAge) : undefined,
+        jenjang: editMemberJenjang,
+        dojang: editMemberDojang,
+        belt: editMemberBelt,
+        status: editMemberStatus,
+        password: editMemberPassword || editingMember.password || '123456',
+      };
+
+      await db.updateUser(updatedUser);
+      await loadAdminData();
+      toastSuccess(`Data anggota ${editMemberName} berhasil diperbarui.`);
+      setEditingMember(null);
+    } catch (err) {
+      console.error(err);
+      toastError('Gagal memperbarui data anggota.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteMember = async (member: User) => {
+    const ok = await confirmModal(
+      'Hapus Anggota',
+      `Apakah Anda yakin ingin menghapus anggota "${member.name}"? Semua data transaksi dan pesanan yang terkait dengan anggota ini tetap ada namun relasi akunnya akan terhapus.`,
+      { confirmLabel: 'Hapus', variant: 'danger' }
+    );
+    if (!ok) return;
+
+    setLoading(true);
+    try {
+      await db.deleteUser(member.id);
+      await loadAdminData();
+      toastSuccess(`Anggota "${member.name}" berhasil dihapus.`);
+      if (viewingMemberDetails && viewingMemberDetails.id === member.id) {
+        viewingMemberDetails && setViewingMemberDetails(null);
+      }
+    } catch (err) {
+      console.error(err);
+      toastError('Gagal menghapus anggota.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Profile Save Handle
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -717,6 +925,7 @@ export default function DashboardAdmin({
       if (filterMemberName && !u.name.toLowerCase().includes(filterMemberName.toLowerCase())) return false;
       if (filterMemberBelt !== 'Semua' && u.belt !== filterMemberBelt) return false;
       if (filterMemberStatus !== 'Semua' && u.status !== filterMemberStatus) return false;
+      if (filterMemberDojang !== 'Semua' && (u.dojang || '').toLowerCase() !== filterMemberDojang.toLowerCase()) return false;
       return true;
     });
 
@@ -1028,6 +1237,7 @@ export default function DashboardAdmin({
       case 'laporan-event': return 'Laporan Event & UKT';
       case 'laporan-keuangan': return 'Laporan Keuangan & Total Keseluruhan';
       case 'kegiatan': return 'Kelola Kegiatan & Event';
+      case 'sabuk': return 'Kelola Tingkatan Sabuk';
       case 'harga-setting': return 'Konfigurasi Harga & Rekening';
       case 'profile-setting': return 'Ubah Profil Admin';
       default: return 'Admin Portal';
@@ -1165,6 +1375,7 @@ export default function DashboardAdmin({
           {renderSidebarItem('pesanan', 'Verifikasi Bayar', <CreditCard size={16} />, pendingPaymentsCount)}
           {renderSidebarItem('produk', 'Kelola Produk', <Package size={16} />)}
           {renderSidebarItem('kategori', 'Kelola Kategori', <Tag size={16} />)}
+          {renderSidebarItem('sabuk', 'Kelola Sabuk', <Award size={16} />)}
           {renderSidebarItem('kegiatan', 'Kelola Kegiatan', <Calendar size={16} />)}
 
           <div className="h-px bg-slate-800/40 my-2 mx-1" />
@@ -1749,6 +1960,13 @@ export default function DashboardAdmin({
                   </div>
                   <div className="flex items-center gap-2">
                     <button
+                      onClick={() => setShowPaymentLogModal(true)}
+                      className="inline-flex items-center gap-1.5 px-3 py-2 bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 rounded-xl text-[10px] font-black uppercase tracking-wider transition"
+                    >
+                      <Receipt size={13} />
+                      Log Pembayaran
+                    </button>
+                    <button
                       onClick={() => exportToCSV('laporan-anggota', ['Nama Lengkap', 'Dojang', 'Kontak', 'Gender', 'Jenjang', 'Sabuk', 'Status'],
                         filteredUsersList.map(u => [u.name, u.dojang || '-', u.phone || '-', u.gender || '-', u.jenjang || '-', u.belt || '-', u.status || '-'])
                       )}
@@ -1775,7 +1993,7 @@ export default function DashboardAdmin({
                 </div>
 
                 {/* Filter Bar */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-slate-50 p-4 rounded-xl border border-slate-100">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 bg-slate-50 p-4 rounded-xl border border-slate-100">
                   <div>
                     <label className="block text-[9px] font-bold text-slate-500 mb-1">Cari Nama Anggota</label>
                     <input
@@ -1787,6 +2005,19 @@ export default function DashboardAdmin({
                     />
                   </div>
                   <div>
+                    <label className="block text-[9px] font-bold text-slate-500 mb-1">Filter Dojang</label>
+                    <select
+                      value={filterMemberDojang}
+                      onChange={e => { setFilterMemberDojang(e.target.value); setCurrentPageLaporanAnggota(1); }}
+                      className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white shadow-xs"
+                    >
+                      <option value="Semua">Semua Dojang</option>
+                      {Array.from(new Set(users.filter(u => u.role === 'anggota' && u.dojang).map(u => u.dojang as string))).sort().map(d => (
+                        <option key={d} value={d}>{d}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
                     <label className="block text-[9px] font-bold text-slate-500 mb-1">Filter Sabuk</label>
                     <select
                       value={filterMemberBelt}
@@ -1794,18 +2025,9 @@ export default function DashboardAdmin({
                       className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white shadow-xs"
                     >
                       <option value="Semua">Semua Sabuk</option>
-                      <option value="Sabuk Putih">Sabuk Putih</option>
-                      <option value="Sabuk Kuning">Sabuk Kuning</option>
-                      <option value="Sabuk Hijau">Sabuk Hijau</option>
-                      <option value="Sabuk Biru">Sabuk Biru</option>
-                      <option value="Sabuk Merah">Sabuk Merah</option>
-                      <option value="Sabuk Hitam">Sabuk Hitam</option>
-                      <option value="Poom 1">Poom 1</option>
-                      <option value="Poom 2">Poom 2</option>
-                      <option value="Poom 3">Poom 3</option>
-                      <option value="Dan 1">Dan 1</option>
-                      <option value="Dan 2">Dan 2</option>
-                      <option value="Dan 3">Dan 3</option>
+                      {belts.map(b => (
+                        <option key={b} value={b}>{b}</option>
+                      ))}
                     </select>
                   </div>
                   <div>
@@ -1907,7 +2129,7 @@ export default function DashboardAdmin({
                                   {u.status}
                                 </span>
                               </td>
-                              <td className="p-3 text-right space-x-1.5">
+                              <td className="p-3 text-right space-x-1.5 whitespace-nowrap">
                                 <button
                                   type="button"
                                   onClick={() => setViewingMemberDetails(u)}
@@ -1915,6 +2137,14 @@ export default function DashboardAdmin({
                                   title="Detail Anggota"
                                 >
                                   <Eye size={12} />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleStartEditMember(u)}
+                                  className="p-1.5 hover:bg-amber-50 text-amber-600 hover:text-amber-700 rounded-lg transition inline-flex items-center justify-center border border-slate-100"
+                                  title="Edit Anggota"
+                                >
+                                  <Edit2 size={12} />
                                 </button>
                                 <button
                                   type="button"
@@ -1928,6 +2158,14 @@ export default function DashboardAdmin({
                                 >
                                   {u.status === 'Aktif' ? <UserX size={12} /> : <UserCheck size={12} />}
                                 </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteMember(u)}
+                                  className="p-1.5 hover:bg-rose-50 text-brand-red hover:text-brand-red/80 rounded-lg transition inline-flex items-center justify-center border border-slate-100"
+                                  title="Hapus Anggota"
+                                >
+                                  <Trash2 size={12} />
+                                </button>
                               </td>
 
                             </tr>
@@ -1935,72 +2173,6 @@ export default function DashboardAdmin({
                       </tbody>
                     </table>
                     {renderPagination(currentPageLaporanAnggota, filteredUsersList.length, setCurrentPageLaporanAnggota)}
-                  </div>
-                </div>
-
-                <div className="space-y-3 pt-6 border-t border-slate-100">
-                  <h4 className="font-black text-slate-800 text-xs uppercase tracking-wider">Log Pembayaran Registrasi Anggota</h4>
-                  <div className="border border-slate-100 rounded-xl overflow-x-auto bg-white shadow-xs">
-                    <table className="w-full text-left text-xs border-collapse min-w-[800px]">
-                      <thead>
-                        <tr className="bg-slate-50 text-slate-500 font-extrabold border-b border-slate-100">
-                          <th className="p-3">Tanggal</th>
-                          <th className="p-3">Nama Anggota</th>
-                          <th className="p-3">Biaya Pendaftaran</th>
-                          <th className="p-3">Status Pembayaran</th>
-                          <th className="p-3 text-right">Aksi</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {registrationTx.slice((currentPageLaporanReg - 1) * 10, currentPageLaporanReg * 10).map(tx => {
-                          const matchingUser = users.find(u => u.id === tx.memberId);
-                          return (
-                            <tr key={tx.id} className="border-b border-slate-100 hover:bg-slate-50/20 transition font-semibold text-slate-650">
-                              <td className="p-3">{tx.date}</td>
-                              <td className="p-3 font-bold text-slate-800">
-                                {matchingUser ? (
-                                  <button
-                                    type="button"
-                                    onClick={() => setViewingMemberDetails(matchingUser)}
-                                    className="hover:text-brand-blue transition text-left focus:outline-hidden"
-                                    title="Klik untuk detail profil"
-                                  >
-                                    {tx.memberName}
-                                  </button>
-                                ) : (
-                                  tx.memberName
-                                )}
-                              </td>
-                              <td className="p-3 text-brand-blue font-bold">Rp {tx.amount.toLocaleString('id-ID')}</td>
-                              <td className="p-3">{renderStatusBadge(tx.status)}</td>
-                              <td className="p-3 text-right">
-                                {matchingUser ? (
-                                  <button
-                                    type="button"
-                                    onClick={() => setViewingMemberDetails(matchingUser)}
-                                    className="p-2 hover:bg-brand-blue/5 text-brand-blue hover:text-brand-blue/80 rounded-xl transition inline-flex items-center justify-center border border-slate-100"
-                                    title="Detail Anggota"
-                                  >
-                                    <Eye size={14} />
-                                  </button>
-                                ) : (
-                                  <span className="text-slate-400">-</span>
-                                )}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                        {registrationTx.length === 0 && (
-                          <tr>
-                            <td colSpan={5} className="p-8 text-center text-slate-400 font-semibold">
-                              Belum ada transaksi pendaftaran masuk.
-                            </td>
-                          </tr>
-                        )}
-
-                      </tbody>
-                    </table>
-                    {renderPagination(currentPageLaporanReg, registrationTx.length, setCurrentPageLaporanReg)}
                   </div>
                 </div>
               </div>
@@ -2230,13 +2402,9 @@ export default function DashboardAdmin({
                       className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white shadow-xs"
                     >
                       <option value="Semua">Semua Sabuk</option>
-                      <option value="Sabuk Putih">Sabuk Putih</option>
-                      <option value="Sabuk Kuning">Sabuk Kuning</option>
-                      <option value="Sabuk Hijau">Sabuk Hijau</option>
-                      <option value="Sabuk Biru">Sabuk Biru</option>
-                      <option value="Sabuk Merah">Sabuk Merah</option>
-                      <option value="Sabuk Hitam">Sabuk Hitam</option>
-                      <option value="Poom">Poom / Dan</option>
+                      {belts.map(b => (
+                        <option key={b} value={b}>{b}</option>
+                      ))}
                     </select>
                   </div>
                 </div>
@@ -2552,7 +2720,7 @@ export default function DashboardAdmin({
                         setEvtType('Seminar');
                         setEvtCatText('');
                         setEvtStatus('Aktif');
-                        setAllowedBelts(['Sabuk Putih', 'Sabuk Kuning', 'Sabuk Hijau', 'Sabuk Biru', 'Sabuk Merah', 'Sabuk Hitam', 'Poom 1', 'Poom 2', 'Poom 3', 'Dan 1', 'Dan 2', 'Dan 3', 'Dan 4']);
+                        setAllowedBelts(belts);
                         setUseCustomPrices(false);
                         setBeltPricesMap({});
                       }}
@@ -2594,7 +2762,7 @@ export default function DashboardAdmin({
                             const val = e.target.value;
                             setEvtType(val as any);
                             if (val === 'UKT') {
-                              setAllowedBelts(['Sabuk Putih', 'Sabuk Kuning', 'Sabuk Hijau', 'Sabuk Biru', 'Sabuk Merah', 'Sabuk Hitam', 'Poom 1', 'Poom 2', 'Poom 3', 'Dan 1', 'Dan 2', 'Dan 3', 'Dan 4']);
+                              setAllowedBelts(belts);
                             }
                           }}
                           className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white cursor-pointer text-slate-800"
@@ -2698,10 +2866,7 @@ export default function DashboardAdmin({
                         <div>
                           <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-3">Pilih Tingkat Sabuk &amp; Biaya:</label>
                           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                            {[
-                              'Sabuk Putih', 'Sabuk Kuning', 'Sabuk Hijau', 'Sabuk Biru', 'Sabuk Merah', 'Sabuk Hitam',
-                              'Poom 1', 'Poom 2', 'Poom 3', 'Dan 1', 'Dan 2', 'Dan 3', 'Dan 4'
-                            ].map(beltName => {
+                            {belts.map(beltName => {
                               const isAllowed = allowedBelts.includes(beltName);
                               return (
                                 <div key={beltName} className={`border rounded-xl p-3 flex flex-col justify-between transition-all duration-200 ${isAllowed ? 'bg-slate-50/50 border-slate-200' : 'bg-slate-100/40 border-slate-200/50 opacity-60'}`}>
@@ -2861,17 +3026,17 @@ export default function DashboardAdmin({
                                           setBeltPricesMap(parsed.beltPrices || {});
                                           setUseCustomPrices(!!parsed.useCustomPrices);
                                         } else {
-                                          setAllowedBelts(['Sabuk Putih', 'Sabuk Kuning', 'Sabuk Hijau', 'Sabuk Biru', 'Sabuk Merah', 'Sabuk Hitam', 'Poom 1', 'Poom 2', 'Poom 3', 'Dan 1', 'Dan 2', 'Dan 3', 'Dan 4']);
+                                          setAllowedBelts(belts);
                                           setBeltPricesMap(parsed || {});
                                           setUseCustomPrices(true);
                                         }
                                       } else {
-                                        setAllowedBelts(['Sabuk Putih', 'Sabuk Kuning', 'Sabuk Hijau', 'Sabuk Biru', 'Sabuk Merah', 'Sabuk Hitam', 'Poom 1', 'Poom 2', 'Poom 3', 'Dan 1', 'Dan 2', 'Dan 3', 'Dan 4']);
+                                        setAllowedBelts(belts);
                                         setBeltPricesMap({});
                                         setUseCustomPrices(false);
                                       }
                                     } catch (err) {
-                                      setAllowedBelts(['Sabuk Putih', 'Sabuk Kuning', 'Sabuk Hijau', 'Sabuk Biru', 'Sabuk Merah', 'Sabuk Hitam', 'Poom 1', 'Poom 2', 'Poom 3', 'Dan 1', 'Dan 2', 'Dan 3', 'Dan 4']);
+                                      setAllowedBelts(belts);
                                       setBeltPricesMap({});
                                       setUseCustomPrices(false);
                                     }
@@ -2884,7 +3049,7 @@ export default function DashboardAdmin({
                                       setEvtType('Lainnya');
                                       setEvtCatText(catVal);
                                     }
-                                    setAllowedBelts(['Sabuk Putih', 'Sabuk Kuning', 'Sabuk Hijau', 'Sabuk Biru', 'Sabuk Merah', 'Sabuk Hitam', 'Poom 1', 'Poom 2', 'Poom 3', 'Dan 1', 'Dan 2', 'Dan 3', 'Dan 4']);
+                                    setAllowedBelts(belts);
                                     setBeltPricesMap({});
                                     setUseCustomPrices(false);
                                   }
@@ -2908,6 +3073,141 @@ export default function DashboardAdmin({
                 </div>
               </div>
             )}
+            {/* TAB: Kelola Sabuk */}
+            {activeTab === 'sabuk' && (
+              <div className="space-y-8 bg-white border border-slate-100 p-4 sm:p-6 rounded-2xl shadow-xs animate-fade-in">
+                <div className="border-b border-slate-100 pb-4">
+                  <h3 className="text-lg font-black text-slate-800">Kelola Tingkatan Sabuk</h3>
+                  <p className="text-slate-400 text-xs mt-0.5">Kelola tingkat sabuk (rank/sabuk) untuk data anggota, turnamen, dan UKT club.</p>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
+                  {/* Left Column: Add Belt */}
+                  <div className="md:col-span-4 bg-slate-50 border border-slate-100 rounded-2xl p-5 space-y-4 w-full">
+                    <h4 className="font-extrabold text-xs text-slate-800 uppercase tracking-wider pb-2 border-b border-slate-200/60">➕ Tambah Sabuk Baru</h4>
+                    <form onSubmit={handleAddBelt} className="space-y-3">
+                      <div>
+                        <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1">Nama Tingkat Sabuk</label>
+                        <input
+                          type="text"
+                          value={newBeltName}
+                          onChange={e => setNewBeltName(e.target.value)}
+                          placeholder="Contoh: Sabuk Kuning Strip Hijau"
+                          className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white text-slate-800"
+                          required
+                          disabled={loading}
+                        />
+                      </div>
+                      <button
+                        type="submit"
+                        disabled={loading || !newBeltName.trim()}
+                        className="w-full py-2 bg-brand-blue hover:bg-brand-blue-hover text-white text-[10px] font-black uppercase rounded-lg tracking-wider transition shadow-sm"
+                      >
+                        Tambah Sabuk
+                      </button>
+                    </form>
+                  </div>
+
+                  {/* Right Column: Belt list & order management */}
+                  <div className="md:col-span-8 space-y-4 w-full">
+                    <div className="flex justify-between items-center">
+                      <h4 className="font-black text-[10px] text-slate-400 uppercase tracking-widest">Daftar Urutan Tingkatan Sabuk ({belts.length})</h4>
+                      <p className="text-[9px] text-slate-400 font-medium">Urutan di bawah ini menentukan hierarki (dari tingkat pemula hingga tinggi).</p>
+                    </div>
+
+                    <div className="border border-slate-100 rounded-2xl overflow-hidden bg-white shadow-xs">
+                      <div className="divide-y divide-slate-100 max-h-[500px] overflow-y-auto scrollbar-thin">
+                        {belts.map((beltName, idx) => {
+                          const isEditing = editingBeltIdx === idx;
+                          return (
+                            <div key={beltName + '-' + idx} className="p-3.5 px-4 flex items-center justify-between gap-4 hover:bg-slate-50/40 transition">
+                              <div className="flex items-center gap-3 flex-1 min-w-0">
+                                <span className="text-[10px] font-mono font-black text-slate-350 w-5 shrink-0">#{idx + 1}</span>
+                                
+                                {isEditing ? (
+                                  <div className="flex items-center gap-2 flex-1 max-w-sm">
+                                    <input
+                                      type="text"
+                                      value={editingBeltName}
+                                      onChange={e => setEditingBeltName(e.target.value)}
+                                      className="px-2.5 py-1 text-xs border border-slate-300 rounded-lg focus:outline-hidden w-full font-semibold bg-white text-slate-800"
+                                      required
+                                      disabled={loading}
+                                      autoFocus
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() => handleEditBeltSubmit(idx)}
+                                      className="px-2 py-1 bg-emerald-500 hover:bg-emerald-600 text-white rounded text-[10px] font-black uppercase"
+                                      disabled={loading}
+                                    >
+                                      Simpan
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => setEditingBeltIdx(null)}
+                                      className="px-2 py-1 border border-slate-200 hover:bg-slate-50 text-slate-500 rounded text-[10px] font-bold"
+                                      disabled={loading}
+                                    >
+                                      Batal
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <span className="font-bold text-slate-800 text-xs truncate">{beltName}</span>
+                                )}
+                              </div>
+
+                              {!isEditing && (
+                                <div className="flex items-center gap-2 shrink-0">
+                                  <button
+                                    type="button"
+                                    disabled={idx === 0 || loading}
+                                    onClick={() => handleMoveBelt(idx, 'up')}
+                                    className="p-1.5 border border-slate-200 rounded-lg hover:bg-slate-50 active:bg-slate-100 disabled:opacity-30 transition text-slate-500"
+                                    title="Pindahkan Ke Atas"
+                                  >
+                                    ▲
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={idx === belts.length - 1 || loading}
+                                    onClick={() => handleMoveBelt(idx, 'down')}
+                                    className="p-1.5 border border-slate-200 rounded-lg hover:bg-slate-50 active:bg-slate-100 disabled:opacity-30 transition text-slate-500"
+                                    title="Pindahkan Ke Bawah"
+                                  >
+                                    ▼
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={loading}
+                                    onClick={() => {
+                                      setEditingBeltIdx(idx);
+                                      setEditingBeltName(beltName);
+                                    }}
+                                    className="px-2.5 py-1 text-[10px] font-black text-brand-blue uppercase hover:underline"
+                                  >
+                                    Edit
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={loading}
+                                    onClick={() => handleDeleteBelt(idx)}
+                                    className="px-2.5 py-1 text-[10px] font-black text-brand-red uppercase hover:underline"
+                                  >
+                                    Hapus
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
 {/* TAB: Profil Admin Setting */}
           {activeTab === 'profile-setting' && (
             <div className="space-y-6 bg-white border border-slate-100 p-4 sm:p-6 rounded-2xl shadow-xs animate-fade-in max-w-md">
@@ -3237,21 +3537,7 @@ export default function DashboardAdmin({
                       {beltDropdownOpen && (
                         <div className="absolute right-0 bottom-full mb-2 z-[110] w-[215px] max-h-[220px] overflow-y-auto bg-white border border-slate-150 rounded-2xl shadow-xl p-1.5 animate-scale-up scrollbar-thin">
                           <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest px-2 py-1 mb-1 border-b border-slate-100">Daftar Sabuk</p>
-                          {[
-                            'Sabuk Putih',
-                            'Sabuk Kuning',
-                            'Sabuk Hijau',
-                            'Sabuk Biru',
-                            'Sabuk Merah',
-                            'Sabuk Hitam',
-                            'Poom 1',
-                            'Poom 2',
-                            'Poom 3',
-                            'Dan 1',
-                            'Dan 2',
-                            'Dan 3',
-                            'Dan 4'
-                          ].map((b) => (
+                          {belts.map((b) => (
                             <button
                               key={b}
                               type="button"
@@ -3279,7 +3565,8 @@ export default function DashboardAdmin({
                                 <span className="text-brand-blue text-[9px] font-black">✓</span>
                               )}
                             </button>
-                          ))}
+                          ))
+                        }
                         </div>
                       )}
                     </div>
@@ -3421,19 +3708,9 @@ export default function DashboardAdmin({
                     onChange={e => setNewMemberBelt(e.target.value)}
                     className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white text-slate-800 cursor-pointer"
                   >
-                    <option value="Sabuk Putih">Sabuk Putih</option>
-                    <option value="Sabuk Kuning">Sabuk Kuning</option>
-                    <option value="Sabuk Hijau">Sabuk Hijau</option>
-                    <option value="Sabuk Biru">Sabuk Biru</option>
-                    <option value="Sabuk Merah">Sabuk Merah</option>
-                    <option value="Sabuk Hitam">Sabuk Hitam</option>
-                    <option value="Poom 1">Poom 1</option>
-                    <option value="Poom 2">Poom 2</option>
-                    <option value="Poom 3">Poom 3</option>
-                    <option value="Dan 1">Dan 1</option>
-                    <option value="Dan 2">Dan 2</option>
-                    <option value="Dan 3">Dan 3</option>
-                    <option value="Dan 4">Dan 4</option>
+                    {belts.map(b => (
+                      <option key={b} value={b}>{b}</option>
+                    ))}
                   </select>
                 </div>
               </div>
@@ -3473,6 +3750,269 @@ export default function DashboardAdmin({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* EDIT MEMBER MODAL */}
+      {editingMember && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 animate-fade-in" onClick={() => setEditingMember(null)}>
+          <div className="bg-white rounded-3xl border border-slate-100 max-w-lg w-full overflow-hidden shadow-2xl animate-scale-up" onClick={e => e.stopPropagation()}>
+            <div className="border-b border-slate-100 p-6 flex justify-between items-center bg-slate-50/50">
+              <div>
+                <h3 className="font-black text-sm text-slate-800 font-sans">Edit Data Anggota</h3>
+                <p className="text-[9px] text-slate-400 uppercase tracking-widest mt-0.5 font-sans">Mengubah Profil Anggota Taekwondo</p>
+              </div>
+              <button onClick={() => setEditingMember(null)} className="text-slate-400 hover:text-slate-650 font-bold transition">
+                ✕
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveEditMember} className="p-6 space-y-4 text-xs font-semibold text-slate-650 max-h-[70vh] overflow-y-auto scrollbar-thin">
+              <div>
+                <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1">Nama Lengkap Anggota *</label>
+                <input
+                  type="text"
+                  value={editMemberName}
+                  onChange={e => setEditMemberName(e.target.value)}
+                  placeholder="Nama Lengkap Anggota..."
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white text-slate-800"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3.5">
+                <div>
+                  <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1">Alamat Email (Opsional)</label>
+                  <input
+                    type="email"
+                    value={editMemberEmail}
+                    onChange={e => setEditMemberEmail(e.target.value)}
+                    placeholder="Contoh: email@domain.com"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white text-slate-800"
+                  />
+                  <p className="text-[9px] text-slate-400 mt-1">Kosongkan untuk anggota lama tanpa email.</p>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1">Nomor WhatsApp / HP</label>
+                  <input
+                    type="tel"
+                    value={editMemberPhone}
+                    onChange={e => setEditMemberPhone(e.target.value.replace(/\D/g, ''))}
+                    placeholder="Contoh: 081234567890"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white text-slate-800"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3.5">
+                <div>
+                  <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1">Jenis Kelamin</label>
+                  <select
+                    value={editMemberGender}
+                    onChange={e => setEditMemberGender(e.target.value as 'Laki-laki' | 'Perempuan')}
+                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white text-slate-800 cursor-pointer"
+                  >
+                    <option value="Laki-laki">♂️ Laki-laki</option>
+                    <option value="Perempuan">♀️ Perempuan</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1">Umur (Tahun)</label>
+                  <input
+                    type="number"
+                    value={editMemberAge}
+                    onChange={e => setEditMemberAge(e.target.value === '' ? '' : Number(e.target.value))}
+                    placeholder="Contoh: 17"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white text-slate-800"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1">Jenjang Pendidikan</label>
+                  <select
+                    value={editMemberJenjang}
+                    onChange={e => setEditMemberJenjang(e.target.value as any)}
+                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white text-slate-800 cursor-pointer"
+                  >
+                    <option value="SD">SD</option>
+                    <option value="SMP">SMP</option>
+                    <option value="SMA/SMK">SMA/SMK</option>
+                    <option value="Umum">Umum</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-3.5">
+                <div className="col-span-2">
+                  <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1">Dojang / Cabang Latihan *</label>
+                  <input
+                    type="text"
+                    value={editMemberDojang}
+                    onChange={e => setEditMemberDojang(e.target.value)}
+                    placeholder="Contoh: Dojang Pusat"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white text-slate-800"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1">Status Anggota</label>
+                  <select
+                    value={editMemberStatus}
+                    onChange={e => setEditMemberStatus(e.target.value as any)}
+                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white text-slate-800 cursor-pointer"
+                  >
+                    <option value="Aktif">Aktif</option>
+                    <option value="Nonaktif">Nonaktif</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3.5">
+                <div>
+                  <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1">Sabuk Saat Ini</label>
+                  <select
+                    value={editMemberBelt}
+                    onChange={e => setEditMemberBelt(e.target.value)}
+                    className="w-full px-3 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white text-slate-800 cursor-pointer"
+                  >
+                    {belts.map(b => (
+                      <option key={b} value={b}>{b}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black uppercase text-slate-400 tracking-wider mb-1">Ubah Kata Sandi (Opsional)</label>
+                  <input
+                    type="password"
+                    value={editMemberPassword}
+                    onChange={e => setEditMemberPassword(e.target.value)}
+                    placeholder="Biarkan kosong jika tidak diubah"
+                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white text-slate-800"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-4 border-t border-slate-100 flex justify-end gap-3 bg-slate-50/50 -mx-6 -mb-6 p-4">
+                <button
+                  type="button"
+                  onClick={() => setEditingMember(null)}
+                  className="px-5 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-black uppercase rounded-xl transition font-sans border border-slate-200"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="px-5 py-2.5 bg-brand-blue hover:bg-brand-blue-hover text-white text-xs font-black uppercase rounded-xl transition font-sans shadow-xs inline-flex items-center gap-1.5"
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 size={12} className="animate-spin" />
+                      <span>Menyimpan...</span>
+                    </>
+                  ) : (
+                    <span>Simpan Perubahan</span>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* PAYMENT LOG MODAL */}
+      {showPaymentLogModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 animate-fade-in" onClick={() => setShowPaymentLogModal(false)}>
+          <div className="bg-white rounded-3xl border border-slate-100 max-w-4xl w-full overflow-hidden shadow-2xl animate-scale-up" onClick={e => e.stopPropagation()}>
+            <div className="border-b border-slate-100 p-6 flex justify-between items-center bg-slate-50/50">
+              <div>
+                <h3 className="font-black text-sm text-slate-800 font-sans">Log Pembayaran Registrasi Anggota</h3>
+                <p className="text-[9px] text-slate-400 uppercase tracking-widest mt-0.5 font-sans">Riwayat Transaksi Pendaftaran Anggota</p>
+              </div>
+              <button onClick={() => setShowPaymentLogModal(false)} className="text-slate-400 hover:text-slate-650 font-bold transition">
+                ✕
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4 text-xs font-semibold text-slate-650 max-h-[70vh] overflow-y-auto scrollbar-thin">
+              <div className="border border-slate-100 rounded-xl overflow-x-auto bg-white shadow-xs">
+                <table className="w-full text-left text-xs border-collapse min-w-[700px]">
+                  <thead>
+                    <tr className="bg-slate-50 text-slate-500 font-extrabold border-b border-slate-100">
+                      <th className="p-3">Tanggal</th>
+                      <th className="p-3">Nama Anggota</th>
+                      <th className="p-3">Biaya Pendaftaran</th>
+                      <th className="p-3">Status Pembayaran</th>
+                      <th className="p-3 text-right">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {registrationTx.slice((currentPageLaporanReg - 1) * 10, currentPageLaporanReg * 10).map(tx => {
+                      const matchingUser = users.find(u => u.id === tx.memberId);
+                      return (
+                        <tr key={tx.id} className="border-b border-slate-100 hover:bg-slate-50/20 transition font-semibold text-slate-650">
+                          <td className="p-3">{tx.date}</td>
+                          <td className="p-3 font-bold text-slate-800">
+                            {matchingUser ? (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setShowPaymentLogModal(false);
+                                  setViewingMemberDetails(matchingUser);
+                                }}
+                                className="hover:text-brand-blue transition text-left focus:outline-hidden"
+                                title="Klik untuk detail profil"
+                              >
+                                {tx.memberName}
+                              </button>
+                            ) : (
+                              tx.memberName
+                            )}
+                          </td>
+                          <td className="p-3 text-brand-blue font-bold">Rp {tx.amount.toLocaleString('id-ID')}</td>
+                          <td className="p-3">{renderStatusBadge(tx.status)}</td>
+                          <td className="p-3 text-right">
+                            {matchingUser ? (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setShowPaymentLogModal(false);
+                                  setViewingMemberDetails(matchingUser);
+                                }}
+                                className="p-2 hover:bg-brand-blue/5 text-brand-blue hover:text-brand-blue/80 rounded-xl transition inline-flex items-center justify-center border border-slate-100"
+                                title="Detail Anggota"
+                              >
+                                <Eye size={14} />
+                              </button>
+                            ) : (
+                              <span className="text-slate-400">-</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    {registrationTx.length === 0 && (
+                      <tr>
+                        <td colSpan={5} className="p-8 text-center text-slate-400 font-semibold">
+                          Belum ada transaksi pendaftaran masuk.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+                {renderPagination(currentPageLaporanReg, registrationTx.length, setCurrentPageLaporanReg)}
+              </div>
+            </div>
+
+            <div className="pt-4 border-t border-slate-100 flex justify-end gap-3 bg-slate-50/50 p-4">
+              <button
+                type="button"
+                onClick={() => setShowPaymentLogModal(false)}
+                className="px-5 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-black uppercase rounded-xl transition font-sans border border-slate-200"
+              >
+                Tutup
+              </button>
+            </div>
           </div>
         </div>
       )}

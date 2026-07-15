@@ -1016,7 +1016,7 @@ Formulir Registrasi:
                     <div key={evt.id} className="border border-slate-100 rounded-xl p-5 flex flex-col bg-slate-50/20 hover:bg-slate-50/60 transition">
                       <div className="flex justify-between items-start gap-2 mb-3">
                         <span className="bg-slate-100 text-slate-600 text-[9px] font-black uppercase px-2 py-0.5 rounded">
-                          {evt.category}
+                          {evt.category.includes(':::') ? evt.category.split(':::')[0] : evt.category}
                         </span>
                         <span className="font-extrabold text-xs text-slate-800">
                           Rp {evt.price.toLocaleString('id-ID')}

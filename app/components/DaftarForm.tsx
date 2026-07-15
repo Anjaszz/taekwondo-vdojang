@@ -44,6 +44,7 @@ export default function DaftarForm({
 
   // Form Fields
   const [name, setName] = useState('');
+  const [belts, setBelts] = useState<string[]>([]);
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
@@ -59,18 +60,25 @@ export default function DaftarForm({
   const [proofPreview, setProofPreview] = useState<string>('');
   const [registeredUser, setRegisteredUser] = useState<User | null>(null);
 
-  // Load Settings
+  // Load Settings & Belts
   useEffect(() => {
-    async function loadSettings() {
+    async function loadSettingsAndBelts() {
       try {
-        const s = await db.getSettings();
+        const [s, b] = await Promise.all([
+          db.getSettings(),
+          db.getBelts(),
+        ]);
         setSettings(s);
+        setBelts(b);
+        if (b && b.length > 0) {
+          setBelt(b[0]);
+        }
       } catch (err) {
         console.error(err);
         toastError('Gagal memuat pengaturan sistem.');
       }
     }
-    loadSettings();
+    loadSettingsAndBelts();
   }, []);
 
   const handleStepOneSubmit = async (e: React.FormEvent) => {
@@ -433,20 +441,11 @@ export default function DaftarForm({
                   <select
                     value={belt}
                     onChange={e => setBelt(e.target.value)}
-                    className="w-full pl-11 pr-10 py-3 rounded-xl border border-slate-200 text-sm font-semibold text-slate-800 focus:outline-none focus:border-brand-blue focus:ring-1 focus:ring-brand-blue/30 transition bg-white appearance-none cursor-pointer"
+                    className="w-full pl-11 pr-10 py-3 rounded-xl border border-slate-200 text-sm font-semibold text-slate-800 focus:outline-none focus:border-brand-blue focus:ring-1 focus:ring-brand-blue/30 transition bg-white appearance-none cursor-pointer text-slate-850"
                   >
-                    <option value="Sabuk Putih">⬜ Sabuk Putih</option>
-                    <option value="Sabuk Kuning">🟨 Sabuk Kuning</option>
-                    <option value="Sabuk Kuning Strip Hijau">🟨🟩 Sabuk Kuning Strip Hijau</option>
-                    <option value="Sabuk Hijau">🟩 Sabuk Hijau</option>
-                    <option value="Sabuk Hijau Strip Biru">🟩🟦 Sabuk Hijau Strip Biru</option>
-                    <option value="Sabuk Biru">🟦 Sabuk Biru</option>
-                    <option value="Sabuk Biru Strip Merah">🟦🟥 Sabuk Biru Strip Merah</option>
-                    <option value="Sabuk Merah">🟥 Sabuk Merah</option>
-                    <option value="Sabuk Merah Strip Hitam (Geup 1)">🟥⬛ Sabuk Merah Strip Hitam (Geup 1)</option>
-                    <option value="Sabuk Merah (Poom 1)">🟥🔴 Sabuk Merah (Poom 1)</option>
-                    <option value="Sabuk Merah (Poom 2)">🟥🔴 Sabuk Merah (Poom 2)</option>
-                    <option value="Sabuk Merah (Poom 3)">🟥🔴 Sabuk Merah (Poom 3)</option>
+                    {belts.map(b => (
+                      <option key={b} value={b}>{b}</option>
+                    ))}
                   </select>
                   <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400 text-[10px]">
                     ▼

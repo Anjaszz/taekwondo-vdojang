@@ -125,6 +125,17 @@ export const db = {
     }
   },
 
+  async deleteUser(userId: string): Promise<void> {
+    if (!supabase) return;
+    try {
+      const { error } = await supabase.from('users').delete().eq('id', userId);
+      if (error) throw error;
+    } catch (err) {
+      console.error('Error deleting user from Supabase:', err);
+      throw err;
+    }
+  },
+
   async addUser(user: User): Promise<void> {
     if (!supabase) return;
     try {
@@ -403,6 +414,82 @@ export const db = {
       if (error) throw error;
     } catch (err) {
       console.error('Error saving settings to Supabase:', err);
+      throw err;
+    }
+  },
+
+  // Belts settings CRUD
+  async getBelts(): Promise<string[]> {
+    const DEFAULT_BELTS = [
+      'Sabuk Putih',
+      'Sabuk Kuning',
+      'Sabuk Kuning Strip Hijau',
+      'Sabuk Hijau',
+      'Sabuk Hijau Strip Biru',
+      'Sabuk Biru',
+      'Sabuk Biru Strip Merah',
+      'Sabuk Merah',
+      'Sabuk Merah Strip Hitam (Geup 1)',
+      'Sabuk Merah (Poom 1)',
+      'Sabuk Merah (Poom 2)',
+      'Sabuk Merah (Poom 3)',
+      'Sabuk Hitam',
+      'Dan 1',
+      'Dan 2',
+      'Dan 3',
+      'Dan 4'
+    ];
+    if (!supabase) return DEFAULT_BELTS;
+    try {
+      const { data, error } = await supabase
+        .from('settings')
+        .select('value')
+        .eq('key', 'belt_settings')
+        .order('key')
+        .limit(1)
+        .maybeSingle();
+      if (error) {
+        console.warn('[getBelts] Error fetching, using defaults:', error.message);
+        return DEFAULT_BELTS;
+      }
+      if (!data) {
+        console.warn('[getBelts] No belt_settings row found, using defaults.');
+        return DEFAULT_BELTS;
+      }
+      // Handle both cases: value could be a JSON array (jsonb) or a JSON string
+      const raw = data.value;
+      if (Array.isArray(raw)) return raw as string[];
+      if (typeof raw === 'string') {
+        try { return JSON.parse(raw) as string[]; } catch { return DEFAULT_BELTS; }
+      }
+      return DEFAULT_BELTS;
+    } catch (err) {
+      console.error('Error fetching belts from Supabase:', err);
+      return DEFAULT_BELTS;
+    }
+  },
+
+  async saveBelts(belts: string[]): Promise<void> {
+    if (!supabase) {
+      console.warn('[saveBelts] Supabase tidak terhubung.');
+      return;
+    }
+    try {
+      // Safe approach: delete all existing belt_settings rows, then insert fresh
+      const { error: deleteError } = await supabase
+        .from('settings')
+        .delete()
+        .eq('key', 'belt_settings');
+      if (deleteError) {
+        console.warn('[saveBelts] delete error (continuing):', deleteError.message);
+      }
+      const { error: insertError } = await supabase
+        .from('settings')
+        .insert({ key: 'belt_settings', value: belts });
+      if (insertError) throw insertError;
+      console.log('[saveBelts] Berhasil disimpan:', belts.length, 'sabuk.');
+    } catch (err) {
+      console.error('Error saving belts to Supabase:', err);
       throw err;
     }
   },
