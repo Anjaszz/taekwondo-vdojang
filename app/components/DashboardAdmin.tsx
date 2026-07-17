@@ -1541,7 +1541,7 @@ export default function DashboardAdmin({
                                   tx.memberName
                                 )}
                               </td>
-                              <td className="p-4">{tx.details}</td>
+                              <td className="p-4">{tx.details.split('\n')[0]}</td>
                               <td className="p-4 text-brand-blue font-bold">Rp {tx.amount.toLocaleString('id-ID')}</td>
                               <td className="p-4">
                                 {renderStatusBadge(tx.status)}
@@ -1597,7 +1597,7 @@ export default function DashboardAdmin({
 
                             <td className="p-4">
                               <div className="flex flex-col">
-                                <span>{tx.details}</span>
+                                 <span>{tx.details.split('\n')[0]}</span>
                                 <span className="text-[9px] uppercase font-bold text-slate-400 mt-0.5">{tx.type}</span>
                               </div>
                             </td>
@@ -2302,7 +2302,7 @@ export default function DashboardAdmin({
                             <tr key={tx.id} className="border-b border-slate-100 hover:bg-slate-50/20 transition font-semibold text-slate-650">
                               <td className="p-3">{tx.date}</td>
                               <td className="p-3 font-bold text-slate-800">{tx.memberName}</td>
-                              <td className="p-3">{tx.details}</td>
+                              <td className="p-3">{tx.details.split('\n')[0]}</td>
                               <td className="p-3 text-brand-blue font-bold text-right">Rp {tx.amount.toLocaleString('id-ID')}</td>
                             </tr>
                           ))}
@@ -2327,7 +2327,7 @@ export default function DashboardAdmin({
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => exportToCSV('laporan-event-ukt', ['Tanggal', 'Nama Anggota', 'Detail Kegiatan', 'Nominal (Rp)'],
-                        filteredEventTx.map(tx => [tx.date, tx.memberName, tx.details, tx.amount])
+                        filteredEventTx.map(tx => [tx.date, tx.memberName, tx.details.split('\n')[0], tx.amount])
                       )}
                       className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-[10px] font-black uppercase tracking-wider transition"
                     >
@@ -2450,7 +2450,7 @@ export default function DashboardAdmin({
                             <tr key={tx.id} className="border-b border-slate-100 hover:bg-slate-50/20 transition font-semibold text-slate-650">
                               <td className="p-3">{tx.date}</td>
                               <td className="p-3 font-bold text-slate-800">{tx.memberName}</td>
-                              <td className="p-3">{tx.details}</td>
+                              <td className="p-3">{tx.details.split('\n')[0]}</td>
                               <td className="p-3 text-brand-blue font-bold text-right">Rp {tx.amount.toLocaleString('id-ID')}</td>
                             </tr>
                           ))}
@@ -2475,7 +2475,7 @@ export default function DashboardAdmin({
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => exportToCSV('laporan-keuangan-total', ['Tanggal', 'ID Transaksi', 'Nama Anggota', 'Tipe', 'Deskripsi', 'Nominal (Rp)'],
-                        filteredFinTx.map(tx => [tx.date, tx.id, tx.memberName, tx.type, tx.details, tx.amount])
+                        filteredFinTx.map(tx => [tx.date, tx.id, tx.memberName, tx.type, tx.details.split('\n')[0], tx.amount])
                       )}
                       className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-[10px] font-black uppercase tracking-wider transition"
                     >
@@ -2612,7 +2612,7 @@ export default function DashboardAdmin({
                                   {tx.type}
                                 </span>
                               </td>
-                              <td className="p-3">{tx.details}</td>
+                              <td className="p-3">{tx.details.split('\n')[0]}</td>
                               <td className="p-3 text-brand-blue font-bold text-right">Rp {tx.amount.toLocaleString('id-ID')}</td>
                               <td className="p-3 text-center">
                                 <button
@@ -3302,7 +3302,7 @@ export default function DashboardAdmin({
             <form onSubmit={handleRejectTransaction} className="p-6 space-y-4">
               <div>
                 <p className="text-[9px] font-bold text-slate-400">Pesan Anggota:</p>
-                <h4 className="font-extrabold text-slate-800 mt-0.5 text-xs">{rejectingTx.details}</h4>
+                <h4 className="font-extrabold text-slate-800 mt-0.5 text-xs">{rejectingTx.details.split('\n')[0]}</h4>
                 <p className="text-[9px] text-brand-blue font-bold mt-0.5">Oleh: {rejectingTx.memberName}</p>
               </div>
 
@@ -3355,7 +3355,7 @@ export default function DashboardAdmin({
             <div className="border-b border-slate-100 p-6 flex justify-between items-center">
               <div>
                 <h3 className="font-black text-sm text-slate-800 font-sans">Bukti Pembayaran</h3>
-                <p className="text-[10px] text-slate-400 uppercase tracking-widest mt-0.5 font-sans">{viewingTxProof.memberName} — {viewingTxProof.details}</p>
+                <p className="text-[10px] text-slate-400 uppercase tracking-widest mt-0.5 font-sans">{viewingTxProof.memberName} — {viewingTxProof.details.split('\n')[0]}</p>
               </div>
               <button onClick={() => setViewingTxProof(null)} className="text-slate-400 hover:text-slate-650 font-bold">
                 ✕

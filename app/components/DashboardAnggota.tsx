@@ -890,24 +890,13 @@ Formulir Registrasi:
                       </select>
                     </div>
                   </div>
-
-                  {(() => {
-                  const eventItem = checkoutItem && checkoutItem.type === 'UKT' ? events.find(e => e.id === checkoutItem.id) : null;
-                  const parsedCat = eventItem ? parseEventCategory(eventItem.category || '') : null;
-                  const isAllowed = !parsedCat || !parsedCat.allowedBelts || parsedCat.allowedBelts.includes(regBelt);
-
-                  if (!isAllowed) return null;
-
-                  return (
-                    <button
-                      type="submit"
-                      disabled={loading}
-                      className="w-full py-3 bg-brand-red hover:bg-brand-red-hover text-white text-xs font-black uppercase tracking-wider rounded-xl transition flex items-center justify-center gap-2"
-                    >
-                      {loading ? 'Mengirim...' : 'Kirim Bukti Pembayaran'}
-                    </button>
-                  );
-                })()}
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full py-3 bg-brand-blue hover:bg-brand-blue-hover text-white text-xs font-black uppercase tracking-wider rounded-xl transition flex items-center justify-center gap-2"
+                  >
+                    {loading ? 'Menyimpan...' : 'Simpan Perubahan'}
+                  </button>
                 </form>
               </div>
             </div>
@@ -932,7 +921,7 @@ Formulir Registrasi:
                             {tx.type}
                           </span>
                         </div>
-                        <h4 className="font-extrabold text-slate-800 text-sm">{tx.details}</h4>
+                        <h4 className="font-extrabold text-slate-800 text-sm">{tx.details.split('\n')[0]}</h4>
                         <p className="text-xs font-bold text-brand-blue">Rp {tx.amount.toLocaleString('id-ID')}</p>
                         
                         {tx.status === 'Ditolak' && tx.rejectReason && (
@@ -1276,7 +1265,7 @@ Formulir Registrasi:
 
             <div className="p-6 space-y-6">
               <div>
-                <h4 className="font-extrabold text-slate-800 text-xs">{reUploadTx.details}</h4>
+                <h4 className="font-extrabold text-slate-800 text-xs">{reUploadTx.details.split('\n')[0]}</h4>
                 <p className="text-[10px] text-rose-600 font-bold mt-1">❌ Ditolak: "{reUploadTx.rejectReason}"</p>
               </div>
 
