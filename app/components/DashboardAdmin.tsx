@@ -988,29 +988,170 @@ export default function DashboardAdmin({
   };
 
   const exportToPDF = (title: string, printAreaId: string) => {
-    const el = document.getElementById(printAreaId);
-    if (!el) return;
     const printWindow = window.open('', '_blank', 'width=900,height=700');
     if (!printWindow) return;
+
+    let tableContentHtml = '';
+
+    if (printAreaId === 'print-laporan-anggota') {
+      tableContentHtml = `
+        <div class="summary-grid" style="display: flex; gap: 15px; margin-bottom: 25px;">
+          <div class="summary-card" style="border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px; background: #f8fafc; flex: 1;">
+            <div class="summary-title" style="font-size: 9px; font-weight: 800; color: #64748b; text-transform: uppercase;">Total Anggota Terdaftar</div>
+            <div class="summary-value" style="font-size: 16px; font-weight: 900; color: #0f172a; margin-top: 4px;">${filteredUsersList.length} Orang</div>
+          </div>
+          <div class="summary-card" style="border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px; background: #f8fafc; flex: 1;">
+            <div class="summary-title" style="font-size: 9px; font-weight: 800; color: #64748b; text-transform: uppercase;">Anggota Aktif</div>
+            <div class="summary-value" style="font-size: 16px; font-weight: 900; color: #059669; margin-top: 4px;">${filteredUsersList.filter(u => u.status === 'Aktif').length} Orang</div>
+          </div>
+          <div class="summary-card" style="border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px; background: #f8fafc; flex: 1;">
+            <div class="summary-title" style="font-size: 9px; font-weight: 800; color: #64748b; text-transform: uppercase;">Anggota Nonaktif</div>
+            <div class="summary-value" style="font-size: 16px; font-weight: 900; color: #e11d48; margin-top: 4px;">${filteredUsersList.filter(u => u.status === 'Nonaktif').length} Orang</div>
+          </div>
+        </div>
+        <h4 style="font-size: 12px; text-transform: uppercase; margin-bottom: 10px; border-left: 3px solid #0f172a; padding-left: 8px;">Tabel Data Keanggotaan</h4>
+        <table>
+          <thead>
+            <tr>
+              <th>Nama Lengkap</th>
+              <th>Dojang</th>
+              <th>Kontak</th>
+              <th>Gender</th>
+              <th>Jenjang</th>
+              <th>Sabuk</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${filteredUsersList.map(u => `
+              <tr>
+                <td style="font-weight: bold;">${u.name}</td>
+                <td>${u.dojang || '-'}</td>
+                <td>${u.phone || '-'}</td>
+                <td>${u.gender || '-'}</td>
+                <td>${u.jenjang || '-'}</td>
+                <td style="font-weight: bold; color: #2563eb;">${u.belt || 'Sabuk Putih'}</td>
+                <td>
+                  <span class="${u.status === 'Aktif' ? 'badge-aktif' : 'badge-nonaktif'}">
+                    ${u.status || 'Aktif'}
+                  </span>
+                </td>
+              </tr>
+            `).join('')}
+            ${filteredUsersList.length === 0 ? `
+              <tr>
+                <td colspan="7" style="text-align: center; padding: 20px; color: #94a3b8;">Tidak ada data anggota.</td>
+              </tr>
+            ` : ''}
+          </tbody>
+        </table>
+      `;
+    } else if (printAreaId === 'print-laporan-aksesoris') {
+      tableContentHtml = `
+        <div class="summary-grid" style="display: flex; gap: 15px; margin-bottom: 25px;">
+          <div class="summary-card" style="border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px; background: #f8fafc; flex: 1;">
+            <div class="summary-title" style="font-size: 9px; font-weight: 800; color: #64748b; text-transform: uppercase;">Total Transaksi</div>
+            <div class="summary-value" style="font-size: 16px; font-weight: 900; color: #0f172a; margin-top: 4px;">${filteredAccessoryTx.length} Transaksi</div>
+          </div>
+          <div class="summary-card" style="border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px; background: #eff6ff; border-color: #bfdbfe; flex: 1;">
+            <div class="summary-title" style="font-size: 9px; font-weight: 800; color: #1d4ed8; text-transform: uppercase;">Total Pendapatan</div>
+            <div class="summary-value" style="font-size: 16px; font-weight: 900; color: #1d4ed8; margin-top: 4px;">Rp ${filteredTotalAccRevenue.toLocaleString('id-ID')}</div>
+          </div>
+        </div>
+        <h4 style="font-size: 12px; text-transform: uppercase; margin-bottom: 10px; border-left: 3px solid #0f172a; padding-left: 8px;">Tabel Penjualan Aksesoris</h4>
+        <table>
+          <thead>
+            <tr>
+              <th>Tanggal</th>
+              <th>Nama Anggota</th>
+              <th>Deskripsi Barang</th>
+              <th style="text-align: right;">Subtotal</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${filteredAccessoryTx.map(tx => `
+              <tr>
+                <td>${tx.date}</td>
+                <td style="font-weight: bold;">${tx.memberName}</td>
+                <td>${tx.details.split('\n')[0]}</td>
+                <td style="font-weight: bold; color: #2563eb; text-align: right;">Rp ${tx.amount.toLocaleString('id-ID')}</td>
+              </tr>
+            `).join('')}
+            ${filteredAccessoryTx.length === 0 ? `
+              <tr>
+                <td colspan="4" style="text-align: center; padding: 20px; color: #94a3b8;">Tidak ada data penjualan aksesoris.</td>
+              </tr>
+            ` : ''}
+          </tbody>
+        </table>
+      `;
+    } else if (printAreaId === 'print-laporan-event') {
+      tableContentHtml = `
+        <div class="summary-grid" style="display: flex; gap: 15px; margin-bottom: 25px;">
+          <div class="summary-card" style="border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px; background: #f8fafc; flex: 1;">
+            <div class="summary-title" style="font-size: 9px; font-weight: 800; color: #64748b; text-transform: uppercase;">Total Peserta</div>
+            <div class="summary-value" style="font-size: 16px; font-weight: 900; color: #0f172a; margin-top: 4px;">${filteredEventTx.length} Orang</div>
+          </div>
+          <div class="summary-card" style="border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px; background: #eff6ff; border-color: #bfdbfe; flex: 1;">
+            <div class="summary-title" style="font-size: 9px; font-weight: 800; color: #1d4ed8; text-transform: uppercase;">Total Pendapatan Event</div>
+            <div class="summary-value" style="font-size: 16px; font-weight: 900; color: #1d4ed8; margin-top: 4px;">Rp ${filteredTotalEvtRevenue.toLocaleString('id-ID')}</div>
+          </div>
+        </div>
+        <h4 style="font-size: 12px; text-transform: uppercase; margin-bottom: 10px; border-left: 3px solid #0f172a; padding-left: 8px;">Tabel Peserta Kegiatan</h4>
+        <table>
+          <thead>
+            <tr>
+              <th>Tanggal</th>
+              <th>Nama Anggota</th>
+              <th>Detail Kegiatan</th>
+              <th style="text-align: right;">Nominal</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${filteredEventTx.map(tx => `
+              <tr>
+                <td>${tx.date}</td>
+                <td style="font-weight: bold;">${tx.memberName}</td>
+                <td>${tx.details.split('\n')[0]}</td>
+                <td style="font-weight: bold; color: #2563eb; text-align: right;">Rp ${tx.amount.toLocaleString('id-ID')}</td>
+              </tr>
+            `).join('')}
+            ${filteredEventTx.length === 0 ? `
+              <tr>
+                <td colspan="4" style="text-align: center; padding: 20px; color: #94a3b8;">Tidak ada data peserta kegiatan.</td>
+              </tr>
+            ` : ''}
+          </tbody>
+        </table>
+      `;
+    } else {
+      const el = document.getElementById(printAreaId);
+      tableContentHtml = el ? el.innerHTML : '';
+    }
+
     printWindow.document.write(`
       <html><head><title>${title}</title>
       <style>
         * { box-sizing: border-box; font-family: Arial, sans-serif; }
-        body { margin: 24px; color: #1e293b; }
-        h1 { font-size: 18px; font-weight: 900; margin-bottom: 4px; }
-        p.subtitle { font-size: 11px; color: #64748b; margin-bottom: 20px; }
-        table { width: 100%; border-collapse: collapse; font-size: 11px; }
+        body { margin: 30px; color: #1e293b; }
+        .header { border-bottom: 3px double #cbd5e1; padding-bottom: 12px; margin-bottom: 25px; text-align: center; }
+        .header h1 { margin: 0; font-size: 20px; font-weight: 900; }
+        .header p { margin: 4px 0 0 0; font-size: 11px; color: #64748b; }
+        table { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 15px; }
         th { background: #f1f5f9; color: #475569; font-weight: 800; padding: 8px 10px; text-align: left; border-bottom: 2px solid #e2e8f0; }
-        td { padding: 7px 10px; border-bottom: 1px solid #f1f5f9; color: #334155; }
+        td { padding: 8px 10px; border-bottom: 1px solid #f1f5f9; color: #334155; }
         tr:nth-child(even) td { background: #f8fafc; }
-        .badge-aktif { background: #ecfdf5; color: #059669; padding: 2px 8px; border-radius: 999px; font-size: 9px; font-weight: 800; }
-        .badge-nonaktif { background: #fff1f2; color: #e11d48; padding: 2px 8px; border-radius: 999px; font-size: 9px; font-weight: 800; }
-        @media print { body { margin: 12px; } }
+        .badge-aktif { background: #ecfdf5; color: #059669; padding: 2px 8px; border-radius: 999px; font-size: 9px; font-weight: 800; display: inline-block; }
+        .badge-nonaktif { background: #fff1f2; color: #e11d48; padding: 2px 8px; border-radius: 999px; font-size: 9px; font-weight: 800; display: inline-block; }
+        @media print { body { margin: 15px; } }
       </style>
       </head><body>
-      <h1>${title}</h1>
-      <p class="subtitle">Dicetak pada: ${new Date().toLocaleString('id-ID')} &nbsp;|&nbsp; V-Dojang Taekwondo</p>
-      ${el.innerHTML}
+      <div class="header">
+        <h1>V-DOJANG TAEKWONDO CLUB</h1>
+        <p style="text-transform: uppercase; font-weight: 800; letter-spacing: 0.05em; margin-top: 2px;">${title}</p>
+        <p style="font-size: 10px; margin-top: 6px;">Dicetak pada: ${new Date().toLocaleString('id-ID')}</p>
+      </div>
+      ${tableContentHtml}
       </body></html>
     `);
     printWindow.document.close();
