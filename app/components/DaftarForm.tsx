@@ -135,6 +135,16 @@ export default function DaftarForm({
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
+      const allowedExtensions = ['png', 'jpg', 'jpeg', 'webp'];
+      const fileExt = file.name.split('.').pop()?.toLowerCase() || '';
+
+      if (!allowedTypes.includes(file.type) && !allowedExtensions.includes(fileExt)) {
+        toastError('Format file tidak valid! Hanya gambar PNG, JPG, JPEG, dan WEBP yang diperbolehkan.');
+        e.target.value = '';
+        return;
+      }
+
       setProofFile(file);
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -543,7 +553,7 @@ export default function DaftarForm({
               <div className="relative group border-2 border-dashed border-slate-200 hover:border-brand-blue/40 rounded-2xl p-8 transition-all duration-200 text-center bg-slate-50/10 hover:bg-slate-50/30 flex flex-col items-center justify-center cursor-pointer">
                 <input
                   type="file"
-                  accept="image/*"
+                  accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp"
                   onChange={handleFileChange}
                   className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                   required={!proofPreview}

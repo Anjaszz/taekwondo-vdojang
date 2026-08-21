@@ -190,6 +190,9 @@ export default function DashboardAdmin({
   const [bankName, setBankName] = useState('');
   const [bankAcc, setBankAcc] = useState('');
   const [bankRecipient, setBankRecipient] = useState('');
+  const [dojangFeesMap, setDojangFeesMap] = useState<Record<string, number>>({});
+  const [customDojangInput, setCustomDojangInput] = useState('');
+  const [customDojangFeeInput, setCustomDojangFeeInput] = useState<number | string>('');
 
   // Load Database Values
   const loadAdminData = async () => {
@@ -220,6 +223,7 @@ export default function DashboardAdmin({
       setBankName(setts.bankName);
       setBankAcc(setts.bankAccount);
       setBankRecipient(setts.bankRecipient);
+      setDojangFeesMap(setts.dojangFees || {});
     }
 
     // Prefill form if editing
@@ -322,6 +326,16 @@ export default function DashboardAdmin({
   const handleProdImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
+      const allowedExtensions = ['png', 'jpg', 'jpeg', 'webp'];
+      const fileExt = file.name.split('.').pop()?.toLowerCase() || '';
+
+      if (!allowedTypes.includes(file.type) && !allowedExtensions.includes(fileExt)) {
+        toastError('Format file tidak valid! Hanya gambar PNG, JPG, JPEG, dan WEBP yang diperbolehkan.');
+        e.target.value = '';
+        return;
+      }
+
       setProdImageFile(file);
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -334,6 +348,30 @@ export default function DashboardAdmin({
   // Product Add/Edit Handle
   const handleSaveProduct = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    const trimmedName = prodName.trim();
+    if (!trimmedName) {
+      toastError('Nama produk wajib diisi.');
+      return;
+    }
+
+    const parsedStock = Number(prodStock);
+    if (isNaN(parsedStock) || parsedStock < 0) {
+      toastError('Stok produk tidak boleh kurang dari 0 (minus).');
+      return;
+    }
+
+    // Check duplicate name (case-insensitive)
+    const isDuplicate = products.some(p => {
+      if (editingProduct && p.id === editingProduct.id) return false;
+      return p.name.trim().toLowerCase() === trimmedName.toLowerCase();
+    });
+
+    if (isDuplicate) {
+      toastError(`Nama produk "${trimmedName}" sudah digunakan oleh barang lain.`);
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -348,9 +386,9 @@ export default function DashboardAdmin({
         if (idx !== -1) {
           prodsList[idx] = {
             ...editingProduct,
-            name: prodName,
+            name: trimmedName,
             price: Number(prodPrice.toString().replace(/\D/g, '')),
-            stock: Number(prodStock),
+            stock: parsedStock,
             description: prodDesc,
             categoryId: prodCatId,
             image: uploadedUrl,
@@ -359,9 +397,9 @@ export default function DashboardAdmin({
       } else {
         prodsList.push({
           id: 'prod-' + Date.now(),
-          name: prodName,
+          name: trimmedName,
           price: Number(prodPrice.toString().replace(/\D/g, '')),
-          stock: Number(prodStock),
+          stock: parsedStock,
           description: prodDesc,
           categoryId: prodCatId,
           image: uploadedUrl,
@@ -852,6 +890,7 @@ export default function DashboardAdmin({
         bankName,
         bankAccount: bankAcc,
         bankRecipient,
+        dojangFees: dojangFeesMap,
       };
 
       await db.saveSettings(newSettings);
@@ -965,6 +1004,7 @@ export default function DashboardAdmin({
   const filteredRegRevenue = filteredFinTx.filter(t => t.type === 'Pendaftaran').reduce((sum, t) => sum + t.amount, 0);
   const filteredAccRevenueFin = filteredFinTx.filter(t => t.type === 'Aksesoris').reduce((sum, t) => sum + t.amount, 0);
   const filteredEvtRevenueFin = filteredFinTx.filter(t => t.type === 'UKT').reduce((sum, t) => sum + t.amount, 0);
+  const filteredIuranRevenueFin = filteredFinTx.filter(t => t.type === 'Iuran').reduce((sum, t) => sum + t.amount, 0);
   const filteredTotalRevenue = filteredFinTx.reduce((sum, t) => sum + t.amount, 0);
 
   // ── Export Helpers ────────────────────────────────────────────────────
@@ -1870,8 +1910,12 @@ export default function DashboardAdmin({
                         <label className="block text-[10px] font-bold text-slate-500 mb-1">Stok Barang</label>
                         <input
                           type="number"
+                          min="0"
                           value={prodStock}
-                          onChange={e => setProdStock(Number(e.target.value))}
+                          onChange={e => {
+                            const val = Number(e.target.value);
+                            setProdStock(val < 0 ? 0 : val);
+                          }}
                           className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white"
                           required
                         />
@@ -1903,7 +1947,7 @@ export default function DashboardAdmin({
                         <div className="flex-1 relative cursor-pointer border border-dashed border-slate-200 hover:border-brand-blue/30 rounded-xl p-3 text-center transition bg-white">
                           <input
                             type="file"
-                            accept="image/*"
+                            accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp"
                             onChange={handleProdImageChange}
                             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                           />
@@ -2673,22 +2717,26 @@ export default function DashboardAdmin({
                 </div>
 
                 {/* Stats Summary Card Row */}
-                <div className="grid grid-cols-1 sm:grid-cols-4 gap-6">
-                  <div className="bg-slate-50 border border-slate-100 rounded-xl p-5">
+                <div className="grid grid-cols-1 sm:grid-cols-5 gap-4">
+                  <div className="bg-slate-50 border border-slate-100 rounded-xl p-4">
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Pendapatan Pendaftaran</p>
-                    <p className="text-xl font-black text-slate-850 mt-1">Rp {filteredRegRevenue.toLocaleString('id-ID')}</p>
+                    <p className="text-lg font-black text-slate-850 mt-1">Rp {filteredRegRevenue.toLocaleString('id-ID')}</p>
                   </div>
-                  <div className="bg-slate-50 border border-slate-100 rounded-xl p-5">
+                  <div className="bg-slate-50 border border-slate-100 rounded-xl p-4">
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Pendapatan Aksesoris</p>
-                    <p className="text-xl font-black text-slate-850 mt-1">Rp {filteredAccRevenueFin.toLocaleString('id-ID')}</p>
+                    <p className="text-lg font-black text-slate-850 mt-1">Rp {filteredAccRevenueFin.toLocaleString('id-ID')}</p>
                   </div>
-                  <div className="bg-slate-50 border border-slate-100 rounded-xl p-5">
+                  <div className="bg-slate-50 border border-slate-100 rounded-xl p-4">
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Pendapatan Event / UKT</p>
-                    <p className="text-xl font-black text-slate-850 mt-1">Rp {filteredEvtRevenueFin.toLocaleString('id-ID')}</p>
+                    <p className="text-lg font-black text-slate-850 mt-1">Rp {filteredEvtRevenueFin.toLocaleString('id-ID')}</p>
                   </div>
-                  <div className="bg-blue-50 border border-blue-100 rounded-xl p-5 shadow-sm shadow-brand-blue/5">
+                  <div className="bg-amber-50/70 border border-amber-100 rounded-xl p-4">
+                    <p className="text-[10px] font-black text-amber-700 uppercase tracking-widest">Pendapatan Iuran</p>
+                    <p className="text-lg font-black text-amber-900 mt-1">Rp {filteredIuranRevenueFin.toLocaleString('id-ID')}</p>
+                  </div>
+                  <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 shadow-sm shadow-brand-blue/5">
                     <p className="text-[10px] font-black text-brand-blue uppercase tracking-widest">Total Keseluruhan</p>
-                    <p className="text-2xl font-black text-brand-blue mt-1">Rp {filteredTotalRevenue.toLocaleString('id-ID')}</p>
+                    <p className="text-xl font-black text-brand-blue mt-1">Rp {filteredTotalRevenue.toLocaleString('id-ID')}</p>
                   </div>
                 </div>
 
@@ -2699,12 +2747,14 @@ export default function DashboardAdmin({
                     const regPct = filteredTotalRevenue > 0 ? (filteredRegRevenue / filteredTotalRevenue) * 100 : 0;
                     const accPct = filteredTotalRevenue > 0 ? (filteredAccRevenueFin / filteredTotalRevenue) * 100 : 0;
                     const evtPct = filteredTotalRevenue > 0 ? (filteredEvtRevenueFin / filteredTotalRevenue) * 100 : 0;
+                    const iuranPct = filteredTotalRevenue > 0 ? (filteredIuranRevenueFin / filteredTotalRevenue) * 100 : 0;
                     return (
                       <div className="space-y-4">
                         <div className="w-full h-4 bg-slate-200 rounded-full overflow-hidden flex">
                           <div style={{ width: `${regPct}%` }} className="bg-brand-blue" title={`Pendaftaran: ${regPct.toFixed(1)}%`}></div>
                           <div style={{ width: `${accPct}%` }} className="bg-emerald-500" title={`Aksesoris: ${accPct.toFixed(1)}%`}></div>
                           <div style={{ width: `${evtPct}%` }} className="bg-brand-red" title={`Event: ${evtPct.toFixed(1)}%`}></div>
+                          <div style={{ width: `${iuranPct}%` }} className="bg-amber-500" title={`Iuran: ${iuranPct.toFixed(1)}%`}></div>
                         </div>
                         <div className="flex flex-wrap gap-6 text-xs font-bold text-slate-650 justify-center">
                           <div className="flex items-center gap-2">
@@ -2718,6 +2768,10 @@ export default function DashboardAdmin({
                           <div className="flex items-center gap-2">
                             <span className="w-3 h-3 bg-brand-red rounded"></span>
                             <span>Event / UKT ({evtPct.toFixed(1)}%)</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="w-3 h-3 bg-amber-500 rounded"></span>
+                            <span>Iuran Bulanan ({iuranPct.toFixed(1)}%)</span>
                           </div>
                         </div>
                       </div>
@@ -2775,67 +2829,156 @@ export default function DashboardAdmin({
 
             {/* TAB: Harga & Bank */}
             {activeTab === 'harga-setting' && (
-              <div className="space-y-8 bg-white border border-slate-100 p-4 sm:p-6 rounded-2xl shadow-xs animate-fade-in max-w-2xl">
-                <form onSubmit={handleSaveSettings} className="bg-slate-50 border border-slate-100 rounded-xl p-5 space-y-4 w-full">
-                  <h4 className="font-black text-xs text-brand-blue uppercase border-b border-slate-200 pb-2">Informasi Pembayaran</h4>
-                  
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 mb-1">Pendaftaran Baru (Rp)</label>
-                    <input
-                      type="text"
-                      value={formatCurrencyInput(regFee)}
-                      onChange={e => setRegFee(e.target.value.replace(/\D/g, ''))}
-                      placeholder="Contoh: 200.000"
-                      className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white"
-                      required
-                    />
+              <div className="space-y-8 bg-white border border-slate-100 p-4 sm:p-6 rounded-2xl shadow-xs animate-fade-in max-w-3xl">
+                <form onSubmit={handleSaveSettings} className="space-y-6">
+                  {/* Bank & General Settings */}
+                  <div className="bg-slate-50 border border-slate-100 rounded-xl p-5 space-y-4 w-full">
+                    <h4 className="font-black text-xs text-brand-blue uppercase border-b border-slate-200 pb-2">Informasi Pembayaran & Bank</h4>
+                    
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-1">Pendaftaran Baru (Rp)</label>
+                      <input
+                        type="text"
+                        value={formatCurrencyInput(regFee)}
+                        onChange={e => setRegFee(e.target.value.replace(/\D/g, ''))}
+                        placeholder="Contoh: 200.000"
+                        className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-1">Nama Bank Penerima</label>
+                      <input
+                        type="text"
+                        value={bankName}
+                        onChange={e => setBankName(e.target.value)}
+                        className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-1">Nomor Rekening</label>
+                      <input
+                        type="text"
+                        value={bankAcc}
+                        onChange={e => setBankAcc(e.target.value)}
+                        className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[10px] font-bold text-slate-500 mb-1">Nama Penerima Rekening</label>
+                      <input
+                        type="text"
+                        value={bankRecipient}
+                        onChange={e => setBankRecipient(e.target.value)}
+                        className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white"
+                        required
+                      />
+                    </div>
                   </div>
 
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 mb-1">Nama Bank Penerima</label>
-                    <input
-                      type="text"
-                      value={bankName}
-                      onChange={e => setBankName(e.target.value)}
-                      className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white"
-                      required
-                    />
-                  </div>
+                  {/* Form Setting Iuran Bulanan Per Dojang */}
+                  <div className="bg-slate-50 border border-slate-100 rounded-xl p-5 space-y-4 w-full">
+                    <h4 className="font-black text-xs text-brand-blue uppercase border-b border-slate-200 pb-2 flex justify-between items-center flex-wrap gap-2">
+                      <span>Tarif Iuran Bulanan Per Dojang</span>
+                      <span className="text-[10px] text-slate-400 font-bold tracking-normal">Pengaturan harga iuran per cabang</span>
+                    </h4>
 
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 mb-1">Nomor Rekening</label>
-                    <input
-                      type="text"
-                      value={bankAcc}
-                      onChange={e => setBankAcc(e.target.value)}
-                      className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white"
-                      required
-                    />
-                  </div>
+                    {/* List of Dojang Fees */}
+                    <div className="space-y-3">
+                      {(() => {
+                        const allDojangs = Array.from(new Set([
+                          ...users.map(u => u.dojang).filter(Boolean) as string[],
+                          ...Object.keys(dojangFeesMap),
+                        ])).sort();
 
-                  <div>
-                    <label className="block text-[10px] font-bold text-slate-500 mb-1">Nama Penerima Rekening</label>
-                    <input
-                      type="text"
-                      value={bankRecipient}
-                      onChange={e => setBankRecipient(e.target.value)}
-                      className="w-full px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white"
-                      required
-                    />
+                        if (allDojangs.length === 0) {
+                          return (
+                            <div className="text-center py-4 text-xs font-bold text-slate-400 border border-dashed border-slate-200 rounded-lg">
+                              Belum ada dojang terdaftar. Tambahkan dojang baru di bawah.
+                            </div>
+                          );
+                        }
+
+                        return allDojangs.map(dName => (
+                          <div key={dName} className="flex items-center justify-between gap-3 bg-white p-3 rounded-lg border border-slate-200 shadow-xs">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-black text-slate-800 truncate">🏢 {dName}</p>
+                            </div>
+                            <div className="w-48 flex items-center gap-1.5 shrink-0">
+                              <span className="text-[11px] font-extrabold text-slate-400">Rp</span>
+                              <input
+                                type="text"
+                                value={formatCurrencyInput(dojangFeesMap[dName] ?? '')}
+                                onChange={e => {
+                                  const val = Number(e.target.value.replace(/\D/g, ''));
+                                  setDojangFeesMap(prev => ({ ...prev, [dName]: val }));
+                                }}
+                                placeholder="Nominal Iuran"
+                                className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 text-xs font-black focus:outline-hidden bg-slate-50 text-slate-800"
+                              />
+                            </div>
+                          </div>
+                        ));
+                      })()}
+
+                      {/* Add Custom Dojang Entry */}
+                      <div className="pt-3 border-t border-slate-200/60 mt-4">
+                        <p className="text-[10px] font-black uppercase tracking-wider text-slate-500 mb-2">Tambah Cabang Dojang Baru</p>
+                        <div className="flex flex-col sm:flex-row gap-2">
+                          <input
+                            type="text"
+                            value={customDojangInput}
+                            onChange={e => setCustomDojangInput(e.target.value)}
+                            placeholder="Nama Dojang Baru (misal: Dojang Garuda)..."
+                            className="flex-1 px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white"
+                          />
+                          <input
+                            type="text"
+                            value={formatCurrencyInput(customDojangFeeInput)}
+                            onChange={e => setCustomDojangFeeInput(e.target.value.replace(/\D/g, ''))}
+                            placeholder="Tarif Iuran (Rp)"
+                            className="w-36 px-3 py-2 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const trimmed = customDojangInput.trim();
+                              if (!trimmed) {
+                                toastWarning('Nama dojang wajib diisi.');
+                                return;
+                              }
+                              const fee = Number(customDojangFeeInput.toString().replace(/\D/g, '')) || 0;
+                              setDojangFeesMap(prev => ({ ...prev, [trimmed]: fee }));
+                              setCustomDojangInput('');
+                              setCustomDojangFeeInput('');
+                              toastSuccess(`Dojang "${trimmed}" ditambahkan ke daftar.`);
+                            }}
+                            className="px-4 py-2 bg-slate-800 text-white text-xs font-black uppercase rounded-lg hover:bg-slate-700 transition shrink-0"
+                          >
+                            + Tambah Dojang
+                          </button>
+                        </div>
+                      </div>
+                    </div>
                   </div>
 
                   <button
                     type="submit"
                     disabled={loading}
-                    className="w-full py-2.5 bg-brand-blue hover:bg-brand-blue-hover text-white text-[10px] font-black uppercase rounded-lg flex items-center justify-center gap-1.5"
+                    className="w-full py-3 bg-brand-blue hover:bg-brand-blue-hover text-white text-xs font-black uppercase tracking-wider rounded-xl flex items-center justify-center gap-1.5 shadow-md shadow-brand-blue/20"
                   >
                     {loading ? (
                       <>
-                        <Loader2 size={12} className="animate-spin" />
-                        <span>Menyimpan...</span>
+                        <Loader2 size={14} className="animate-spin" />
+                        <span>Menyimpan Pengaturan...</span>
                       </>
                     ) : (
-                      <span>Simpan Pengaturan</span>
+                      <span>Simpan Semua Pengaturan</span>
                     )}
                   </button>
                 </form>

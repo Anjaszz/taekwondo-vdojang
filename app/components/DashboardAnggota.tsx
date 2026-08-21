@@ -136,7 +136,7 @@ interface DashboardAnggotaProps {
   setActiveTabProp: (tab: string) => void;
 }
 
-type TabType = 'profil' | 'riwayat' | 'kegiatan';
+type TabType = 'profil' | 'riwayat' | 'kegiatan' | 'iuran';
 
 export default function DashboardAnggota({
   user,
@@ -407,7 +407,7 @@ export default function DashboardAnggota({
 
   // Modal / Checkout states
   const [checkoutItem, setCheckoutItem] = useState<{
-    type: 'UKT' | 'Aksesoris';
+    type: 'UKT' | 'Aksesoris' | 'Iuran';
     id: string;
     name: string;
     price: number;
@@ -421,6 +421,22 @@ export default function DashboardAnggota({
   const [reUploadTx, setReUploadTx] = useState<Transaction | null>(null);
   const [reUploadFile, setReUploadFile] = useState<File | null>(null);
   const [reUploadPreview, setReUploadPreview] = useState<string>('');
+
+  // Iuran Month & Year selection states
+  const [iuranMonth, setIuranMonth] = useState<string>(() => String(new Date().getMonth() + 1).padStart(2, '0'));
+  const [iuranYear, setIuranYear] = useState<string>(() => String(new Date().getFullYear()));
+
+  const openIuranCheckout = (dojangName: string, feeAmount: number, periodStr: string) => {
+    setCheckoutItem({
+      type: 'Iuran',
+      id: `iuran-${user.id}-${iuranYear}-${iuranMonth}`,
+      name: `Iuran Bulanan ${dojangName} (${periodStr})`,
+      price: feeAmount,
+      extraDetail: periodStr,
+    });
+    setCheckoutFile(null);
+    setCheckoutPreview('');
+  };
 
   // Load Data
   const loadDashboardData = async () => {
@@ -499,6 +515,16 @@ export default function DashboardAnggota({
   const handleCheckoutFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
+      const allowedExtensions = ['png', 'jpg', 'jpeg', 'webp'];
+      const fileExt = file.name.split('.').pop()?.toLowerCase() || '';
+
+      if (!allowedTypes.includes(file.type) && !allowedExtensions.includes(fileExt)) {
+        toastError('Format file tidak valid! Hanya gambar PNG, JPG, JPEG, dan WEBP yang diperbolehkan.');
+        e.target.value = '';
+        return;
+      }
+
       setCheckoutFile(file);
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -540,6 +566,11 @@ Formulir Registrasi:
 - Unit Latihan / Sekolah: ${regUnit}
 - Sabuk Saat Ini: ${regBelt}
 - No Telp Orang Tua: ${regParentPhone}`;
+      } else if (checkoutItem.type === 'Iuran') {
+        detailsString = `Pembayaran Iuran Bulanan: ${checkoutItem.name}
+-----------------------------
+Cabang Dojang: ${user.dojang || '-'}
+Periode: ${checkoutItem.extraDetail || ''}`;
       } else {
         detailsString = `Pembelian Aksesoris: ${checkoutItem.name}`;
       }
@@ -708,6 +739,22 @@ Formulir Registrasi:
             {transactions.some(t => t.status === 'Pending') && (
               <span className="w-2 h-2 bg-brand-red rounded-full"></span>
             )}
+          </button>
+          <button
+            onClick={() => setActiveTab('iuran')}
+            className={`w-full py-2.5 px-3 rounded-xl text-left text-xs font-black uppercase tracking-wider transition flex justify-between items-center ${
+              activeTab === 'iuran' ? 'bg-brand-blue text-white shadow-xs' : 'text-slate-500 hover:bg-slate-50'
+            }`}
+          >
+            <span>💵 Iuran Bulanan</span>
+            {(() => {
+              const currentPeriodStr = `${iuranYear}-${iuranMonth}`;
+              const currentPaid = transactions.some(t => t.type === 'Iuran' && t.details.includes(currentPeriodStr) && (t.status === 'Berhasil' || t.status === 'Pending'));
+              if (!currentPaid) {
+                return <span className="w-2.5 h-2.5 bg-amber-500 rounded-full" title="Iuran belum dibayar"></span>;
+              }
+              return null;
+            })()}
           </button>
           <button
             onClick={() => setActiveTab('kegiatan')}
@@ -1068,6 +1115,192 @@ Formulir Registrasi:
             </div>
           )}
 
+          {/* TAB: Iuran Bulanan */}
+          {activeTab === 'iuran' && (
+            <div className="space-y-6">
+              <div>
+                <h3 className="text-lg font-black text-slate-800">Iuran Bulanan Dojang</h3>
+                <p className="text-slate-400 text-xs mt-0.5">Kelola dan bayar iuran bulanan tempat latihan Anda.</p>
+              </div>
+
+              {/* Dojang & Fee Info Card */}
+              <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl p-6 text-white shadow-md space-y-4">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 border-b border-slate-700/60 pb-4">
+                  <div>
+                    <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">Cabang Dojang Anda</span>
+                    <h4 className="text-xl font-black text-white mt-0.5">🏢 {user.dojang || 'Belum Ditentukan'}</h4>
+                  </div>
+                  <div className="text-left sm:text-right">
+                    <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">Tarif Iuran Bulanan</span>
+                    <p className="text-2xl font-black text-emerald-400 mt-0.5">
+                      Rp {((settings?.dojangFees?.[user.dojang || ''] || 0)).toLocaleString('id-ID')}
+                    </p>
+                  </div>
+                </div>
+
+                {!user.dojang ? (
+                  <p className="text-xs text-amber-300 font-semibold">
+                    ⚠️ Anda belum memilih Dojang pada profil. Silakan perbarui profil Anda terlebih dahulu.
+                  </p>
+                ) : !settings?.dojangFees?.[user.dojang] ? (
+                  <p className="text-xs text-slate-300 font-semibold">
+                    ℹ️ Nominal iuran bulanan untuk {user.dojang} belum diatur oleh admin. Silakan tanyakan ke admin dojang Anda.
+                  </p>
+                ) : null}
+              </div>
+
+              {/* Month/Year Selector & Payment Status */}
+              <div className="bg-slate-50 border border-slate-100 rounded-2xl p-6 space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200/60">
+                  <div>
+                    <h4 className="font-extrabold text-sm text-slate-800">Pilih Periode Iuran</h4>
+                    <p className="text-xs text-slate-400">Pilih bulan dan tahun pembayaran iuran</p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <select
+                      value={iuranMonth}
+                      onChange={e => setIuranMonth(e.target.value)}
+                      className="px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-bold bg-white text-slate-800 shadow-xs focus:outline-hidden"
+                    >
+                      <option value="01">Januari</option>
+                      <option value="02">Februari</option>
+                      <option value="03">Maret</option>
+                      <option value="04">April</option>
+                      <option value="05">Mei</option>
+                      <option value="06">Juni</option>
+                      <option value="07">Juli</option>
+                      <option value="08">Agustus</option>
+                      <option value="09">September</option>
+                      <option value="10">Oktober</option>
+                      <option value="11">November</option>
+                      <option value="12">Desember</option>
+                    </select>
+
+                    <select
+                      value={iuranYear}
+                      onChange={e => setIuranYear(e.target.value)}
+                      className="px-3.5 py-2 rounded-xl border border-slate-200 text-xs font-bold bg-white text-slate-800 shadow-xs focus:outline-hidden"
+                    >
+                      {['2025', '2026', '2027', '2028'].map(yr => (
+                        <option key={yr} value={yr}>{yr}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Status Box for Selected Month */}
+                {(() => {
+                  const monthNamesMap: Record<string, string> = {
+                    '01': 'Januari', '02': 'Februari', '03': 'Maret', '04': 'April',
+                    '05': 'Mei', '06': 'Juni', '07': 'Juli', '08': 'Agustus',
+                    '09': 'September', '10': 'Oktober', '11': 'November', '12': 'Desember'
+                  };
+                  const periodLabel = `${monthNamesMap[iuranMonth]} ${iuranYear}`;
+                  const currentFee = settings?.dojangFees?.[user.dojang || ''] || 0;
+
+                  // Find transaction matching this period
+                  const matchingTx = transactions.find(
+                    t => t.type === 'Iuran' && t.details.includes(periodLabel)
+                  );
+
+                  if (matchingTx?.status === 'Berhasil') {
+                    return (
+                      <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-6 flex flex-col sm:flex-row justify-between items-center gap-4 text-emerald-800">
+                        <div className="space-y-1 text-center sm:text-left">
+                          <span className="bg-emerald-600 text-white text-[9px] font-black uppercase px-2.5 py-1 rounded-full">
+                            ✓ Terbayar / Lunas
+                          </span>
+                          <h5 className="font-black text-base mt-2">Iuran Bulanan {periodLabel} Lunas</h5>
+                          <p className="text-xs text-emerald-700">Pembayaran telah dikonfirmasi oleh Admin pada tanggal {matchingTx.date}.</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => printKwitansi(matchingTx)}
+                          className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black uppercase rounded-xl transition shadow-xs shrink-0"
+                        >
+                          🧾 Cetak Kwitansi
+                        </button>
+                      </div>
+                    );
+                  }
+
+                  if (matchingTx?.status === 'Pending') {
+                    return (
+                      <div className="bg-amber-50 border border-amber-200 rounded-2xl p-6 flex flex-col sm:flex-row justify-between items-center gap-4 text-amber-900">
+                        <div className="space-y-1 text-center sm:text-left">
+                          <span className="bg-amber-500 text-white text-[9px] font-black uppercase px-2.5 py-1 rounded-full">
+                            ⏳ Menunggu Verifikasi
+                          </span>
+                          <h5 className="font-black text-base mt-2">Bukti Bayar Periode {periodLabel} Diproses</h5>
+                          <p className="text-xs text-amber-700">Bukti pembayaran telah dikirim dan sedang diverifikasi oleh Admin.</p>
+                        </div>
+                        {matchingTx.proofImage && (
+                          <a
+                            href={matchingTx.proofImage}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-4 py-2.5 bg-white border border-amber-300 text-amber-900 hover:bg-amber-100 text-xs font-bold rounded-xl transition shrink-0"
+                          >
+                            🖼️ Lihat Bukti Transfer
+                          </a>
+                        )}
+                      </div>
+                    );
+                  }
+
+                  if (matchingTx?.status === 'Ditolak') {
+                    return (
+                      <div className="bg-rose-50 border border-rose-200 rounded-2xl p-6 flex flex-col sm:flex-row justify-between items-center gap-4 text-rose-900">
+                        <div className="space-y-1 text-center sm:text-left">
+                          <span className="bg-rose-600 text-white text-[9px] font-black uppercase px-2.5 py-1 rounded-full">
+                            ❌ Ditolak
+                          </span>
+                          <h5 className="font-black text-base mt-2">Pembayaran Periode {periodLabel} Ditolak</h5>
+                          <p className="text-xs text-rose-700">Alasan: "{matchingTx.rejectReason || 'Bukti transfer tidak valid'}"</p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setReUploadTx(matchingTx);
+                            setReUploadFile(null);
+                            setReUploadPreview('');
+                          }}
+                          className="px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-black uppercase rounded-xl transition shadow-xs shrink-0"
+                        >
+                          🔄 Kirim Ulang Bukti Bayar
+                        </button>
+                      </div>
+                    );
+                  }
+
+                  // Default: Belum dibayar
+                  return (
+                    <div className="bg-white border border-slate-200 rounded-2xl p-6 flex flex-col sm:flex-row justify-between items-center gap-4 text-slate-800 shadow-xs">
+                      <div className="space-y-1 text-center sm:text-left">
+                        <span className="bg-slate-100 text-slate-600 text-[9px] font-black uppercase px-2.5 py-1 rounded-full">
+                          Belum Dibayar
+                        </span>
+                        <h5 className="font-black text-base text-slate-800 mt-2">Iuran Bulanan {periodLabel}</h5>
+                        <p className="text-xs text-slate-500">
+                          Total tagihan: <strong className="text-brand-blue">Rp {currentFee.toLocaleString('id-ID')}</strong>
+                        </p>
+                      </div>
+
+                      <button
+                        type="button"
+                        disabled={!user.dojang || currentFee <= 0}
+                        onClick={() => openIuranCheckout(user.dojang || 'Dojang', currentFee, periodLabel)}
+                        className="px-5 py-3 bg-brand-blue hover:bg-brand-blue-hover disabled:opacity-50 text-white text-xs font-black uppercase tracking-wider rounded-xl transition shadow-md shadow-brand-blue/20 shrink-0"
+                      >
+                        💳 Bayar Iuran Bulanan
+                      </button>
+                    </div>
+                  );
+                })()}
+              </div>
+            </div>
+          )}
+
         </main>
       </div>
 
@@ -1220,7 +1453,7 @@ Formulir Registrasi:
                   <div className="flex flex-col items-center justify-center border border-dashed border-slate-200 hover:border-brand-blue/30 rounded-xl p-4 transition bg-slate-50/20 cursor-pointer relative">
                     <input
                       type="file"
-                      accept="image/*"
+                      accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp"
                       onChange={handleCheckoutFileChange}
                       className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                       required
@@ -1291,10 +1524,20 @@ Formulir Registrasi:
                   <div className="flex flex-col items-center justify-center border border-dashed border-slate-200 hover:border-brand-blue/30 rounded-xl p-4 transition bg-slate-50/20 cursor-pointer relative">
                     <input
                       type="file"
-                      accept="image/*"
+                      accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp"
                       onChange={e => {
                         const file = e.target.files?.[0];
                         if (file) {
+                          const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
+                          const allowedExtensions = ['png', 'jpg', 'jpeg', 'webp'];
+                          const fileExt = file.name.split('.').pop()?.toLowerCase() || '';
+
+                          if (!allowedTypes.includes(file.type) && !allowedExtensions.includes(fileExt)) {
+                            toastError('Format file tidak valid! Hanya gambar PNG, JPG, JPEG, dan WEBP yang diperbolehkan.');
+                            e.target.value = '';
+                            return;
+                          }
+
                           setReUploadFile(file);
                           const reader = new FileReader();
                           reader.onloadend = () => setReUploadPreview(reader.result as string);

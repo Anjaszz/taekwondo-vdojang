@@ -224,6 +224,16 @@ export default function LandingPage({
   const handleCheckoutFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
+      const allowedExtensions = ['png', 'jpg', 'jpeg', 'webp'];
+      const fileExt = file.name.split('.').pop()?.toLowerCase() || '';
+
+      if (!allowedTypes.includes(file.type) && !allowedExtensions.includes(fileExt)) {
+        toastError('Format file tidak valid! Hanya gambar PNG, JPG, JPEG, dan WEBP yang diperbolehkan.');
+        e.target.value = '';
+        return;
+      }
+
       setCheckoutFile(file);
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -1030,7 +1040,7 @@ Formulir Registrasi:
                   <div className="flex flex-col items-center justify-center border border-dashed border-slate-200 hover:border-brand-blue/30 rounded-xl p-4 transition bg-slate-50/20 cursor-pointer relative">
                     <input
                       type="file"
-                      accept="image/*"
+                      accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp"
                       onChange={handleCheckoutFileChange}
                       className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                       required

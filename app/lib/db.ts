@@ -45,7 +45,7 @@ export interface Transaction {
   id: string;
   memberId: string;
   memberName: string;
-  type: 'Pendaftaran' | 'UKT' | 'Aksesoris';
+  type: 'Pendaftaran' | 'UKT' | 'Aksesoris' | 'Iuran';
   details: string;
   amount: number;
   proofImage: string; // URL
@@ -59,6 +59,7 @@ export interface SystemSettings {
   bankName: string;
   bankAccount: string;
   bankRecipient: string;
+  dojangFees?: Record<string, number>;
 }
 
 // Supabase Configuration
@@ -77,6 +78,7 @@ const DEFAULT_SETTINGS: SystemSettings = {
   bankName: 'Belum Dikonfigurasi',
   bankAccount: '-',
   bankRecipient: '-',
+  dojangFees: {},
 };
 
 export const db = {
@@ -282,18 +284,21 @@ export const db = {
         .select('*')
         .order('date', { ascending: false });
       if (error) throw error;
-      return (data || []).map((t: any) => ({
-        id: t.id,
-        memberId: t.member_id,
-        memberName: t.member_name,
-        type: t.type,
-        details: t.details,
-        amount: Number(t.amount),
-        proofImage: t.proof_image || '',
-        status: t.status,
-        rejectReason: t.reject_reason || undefined,
-        date: t.date,
-      }));
+      return (data || []).map((t: any) => {
+        const isIuran = t.type === 'Iuran' || (t.details && (t.details.startsWith('[Iuran]') || t.details.toLowerCase().includes('iuran bulanan')));
+        return {
+          id: t.id,
+          memberId: t.member_id,
+          memberName: t.member_name,
+          type: isIuran ? 'Iuran' : t.type,
+          details: t.details,
+          amount: Number(t.amount),
+          proofImage: t.proof_image || '',
+          status: t.status,
+          rejectReason: t.reject_reason || undefined,
+          date: t.date,
+        };
+      });
     } catch (err) {
       console.error('Error fetching transactions from Supabase:', err);
       return [];
@@ -303,18 +308,26 @@ export const db = {
   async saveTransactions(transactions: Transaction[]): Promise<void> {
     if (!supabase) return;
     try {
-      const mapped = transactions.map((t) => ({
-        id: t.id,
-        member_id: t.memberId,
-        member_name: t.memberName,
-        type: t.type,
-        details: t.details,
-        amount: t.amount,
-        proof_image: t.proofImage || null,
-        status: t.status,
-        reject_reason: t.rejectReason || null,
-        date: t.date,
-      }));
+      const mapped = transactions.map((t) => {
+        const isIuran = t.type === 'Iuran';
+        const mappedType = isIuran ? 'Aksesoris' : t.type;
+        let details = t.details;
+        if (isIuran && !details.startsWith('[Iuran]')) {
+          details = `[Iuran] ${details}`;
+        }
+        return {
+          id: t.id,
+          member_id: t.memberId,
+          member_name: t.memberName,
+          type: mappedType,
+          details: details,
+          amount: t.amount,
+          proof_image: t.proofImage || null,
+          status: t.status,
+          reject_reason: t.rejectReason || null,
+          date: t.date,
+        };
+      });
       const { error } = await supabase.from('transactions').upsert(mapped);
       if (error) throw error;
     } catch (err) {
@@ -326,12 +339,18 @@ export const db = {
   async addTransaction(tx: Transaction): Promise<void> {
     if (!supabase) return;
     try {
+      const isIuran = tx.type === 'Iuran';
+      const mappedType = isIuran ? 'Aksesoris' : tx.type;
+      let details = tx.details;
+      if (isIuran && !details.startsWith('[Iuran]')) {
+        details = `[Iuran] ${details}`;
+      }
       const mapped = {
         id: tx.id,
         member_id: tx.memberId,
         member_name: tx.memberName,
-        type: tx.type,
-        details: tx.details,
+        type: mappedType,
+        details: details,
         amount: tx.amount,
         proof_image: tx.proofImage || null,
         status: tx.status,

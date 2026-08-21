@@ -229,10 +229,20 @@ function PendingActivation({ user, onLogout }: { user: User; onLogout: () => voi
                       <div className="relative group border-2 border-dashed border-slate-200 hover:border-brand-blue/45 rounded-2xl p-6 transition-all duration-200 text-center bg-slate-50/10 hover:bg-slate-50/30 flex flex-col items-center justify-center cursor-pointer">
                         <input
                           type="file"
-                          accept="image/*"
+                          accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp"
                           onChange={e => {
                             const file = e.target.files?.[0];
                             if (file) {
+                              const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
+                              const allowedExtensions = ['png', 'jpg', 'jpeg', 'webp'];
+                              const fileExt = file.name.split('.').pop()?.toLowerCase() || '';
+
+                              if (!allowedTypes.includes(file.type) && !allowedExtensions.includes(fileExt)) {
+                                toastError('Format file tidak valid! Hanya gambar PNG, JPG, JPEG, dan WEBP yang diperbolehkan.');
+                                e.target.value = '';
+                                return;
+                              }
+
                               setReUploadFile(file);
                               const reader = new FileReader();
                               reader.onloadend = () => setReUploadPreview(reader.result as string);
