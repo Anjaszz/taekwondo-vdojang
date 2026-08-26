@@ -38,6 +38,7 @@ type TabType =
   | 'laporan-anggota'
   | 'laporan-aksesoris'
   | 'laporan-event'
+  | 'laporan-iuran'
   | 'laporan-keuangan'
   | 'profile-setting'
   | 'harga-setting';
@@ -98,6 +99,12 @@ export default function DashboardAdmin({
 
   const [filterFinMonth, setFilterFinMonth] = useState('Semua');
   const [filterFinYear, setFilterFinYear] = useState('Semua');
+
+  const [currentPageLaporanIuran, setCurrentPageLaporanIuran] = useState(1);
+  const [filterIuranMonth, setFilterIuranMonth] = useState('Semua');
+  const [filterIuranYear, setFilterIuranYear] = useState('Semua');
+  const [filterIuranDojang, setFilterIuranDojang] = useState('Semua');
+  const [filterIuranStatus, setFilterIuranStatus] = useState('Semua');
 
   // Loaded DB data
   const [users, setUsers] = useState<User[]>([]);
@@ -994,6 +1001,22 @@ export default function DashboardAdmin({
   });
   const filteredTotalEvtRevenue = filteredEventTx.reduce((sum, t) => sum + t.amount, 0);
 
+  const iuranTx = transactions.filter(t => t.type === 'Iuran');
+  const filteredIuranTx = iuranTx.filter(tx => {
+    if (filterIuranMonth !== 'Semua' && tx.date.split('-')[1] !== filterIuranMonth) return false;
+    if (filterIuranYear !== 'Semua' && tx.date.split('-')[0] !== filterIuranYear) return false;
+    if (filterIuranStatus !== 'Semua' && tx.status !== filterIuranStatus) return false;
+    if (filterIuranDojang !== 'Semua') {
+      const userOfTx = users.find(u => u.id === tx.memberId);
+      const dojangStr = `${userOfTx?.dojang || ''} ${tx.details || ''}`.toLowerCase();
+      if (!dojangStr.includes(filterIuranDojang.toLowerCase())) return false;
+    }
+    return true;
+  });
+  const filteredTotalIuranRevenue = filteredIuranTx
+    .filter(t => t.status === 'Berhasil')
+    .reduce((sum, t) => sum + t.amount, 0);
+
   const filteredFinTx = transactions
     .filter(t => t.status === 'Berhasil')
     .filter(tx => {
@@ -1164,6 +1187,95 @@ export default function DashboardAdmin({
           </tbody>
         </table>
       `;
+    } else if (printAreaId === 'print-laporan-iuran') {
+      const lunasCount = filteredIuranTx.filter(t => t.status === 'Berhasil').length;
+      const pendingCount = filteredIuranTx.filter(t => t.status === 'Pending').length;
+      const printDateStr = new Date().toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' });
+      
+      tableContentHtml = `
+        <div class="summary-grid" style="display: flex; gap: 12px; margin-bottom: 20px;">
+          <div class="summary-card" style="border: 1px solid #e2e8f0; border-radius: 10px; padding: 10px 14px; background: #f8fafc; flex: 1;">
+            <div class="summary-title" style="font-size: 9px; font-weight: 800; color: #64748b; text-transform: uppercase;">Total Transaksi</div>
+            <div class="summary-value" style="font-size: 15px; font-weight: 900; color: #0f172a; margin-top: 2px;">${filteredIuranTx.length} Transaksi</div>
+          </div>
+          <div class="summary-card" style="border: 1px solid #fde68a; border-radius: 10px; padding: 10px 14px; background: #fffbeb; flex: 1;">
+            <div class="summary-title" style="font-size: 9px; font-weight: 800; color: #b45309; text-transform: uppercase;">Total Pendapatan (Lunas)</div>
+            <div class="summary-value" style="font-size: 15px; font-weight: 900; color: #b45309; margin-top: 2px;">Rp ${filteredTotalIuranRevenue.toLocaleString('id-ID')}</div>
+          </div>
+          <div class="summary-card" style="border: 1px solid #a7f3d0; border-radius: 10px; padding: 10px 14px; background: #ecfdf5; flex: 1;">
+            <div class="summary-title" style="font-size: 9px; font-weight: 800; color: #047857; text-transform: uppercase;">Lunas / Berhasil</div>
+            <div class="summary-value" style="font-size: 15px; font-weight: 900; color: #047857; margin-top: 2px;">${lunasCount} Pembayaran</div>
+          </div>
+          <div class="summary-card" style="border: 1px solid #bfdbfe; border-radius: 10px; padding: 10px 14px; background: #eff6ff; flex: 1;">
+            <div class="summary-title" style="font-size: 9px; font-weight: 800; color: #1d4ed8; text-transform: uppercase;">Pending</div>
+            <div class="summary-value" style="font-size: 15px; font-weight: 900; color: #1d4ed8; margin-top: 2px;">${pendingCount} Pembayaran</div>
+          </div>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+          <h4 style="font-size: 11px; font-weight: 800; text-transform: uppercase; margin: 0; border-left: 3px solid #0f172a; padding-left: 8px;">Tabel Data Pembayaran Iuran Bulanan</h4>
+          <span style="font-size: 10px; color: #64748b; font-weight: 600;">Periode: ${filterIuranMonth === 'Semua' ? 'Semua Bulan' : filterIuranMonth}/${filterIuranYear} | Dojang: ${filterIuranDojang}</span>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th style="width: 30px; text-align: center;">No</th>
+              <th style="width: 85px;">Tanggal</th>
+              <th>Nama Anggota</th>
+              <th>Dojang</th>
+              <th>Rincian Periode</th>
+              <th style="width: 80px; text-align: center;">Status</th>
+              <th style="width: 110px; text-align: right;">Nominal</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${filteredIuranTx.map((tx, idx) => {
+              const u = users.find(usr => usr.id === tx.memberId);
+              const cleanDetails = tx.details.split('\n')[0].replace('[Iuran] ', '');
+              const statusClass = tx.status === 'Berhasil' ? 'badge-aktif' : tx.status === 'Ditolak' ? 'badge-nonaktif' : 'badge-pending';
+              const statusLabel = tx.status === 'Berhasil' ? 'LUNAS' : tx.status;
+              return `
+              <tr>
+                <td style="text-align: center; color: #64748b; font-weight: 600;">${idx + 1}</td>
+                <td>${tx.date}</td>
+                <td style="font-weight: bold; color: #0f172a;">${tx.memberName}</td>
+                <td>${u?.dojang || '-'}</td>
+                <td>${cleanDetails}</td>
+                <td style="text-align: center;">
+                  <span class="${statusClass}">${statusLabel}</span>
+                </td>
+                <td style="font-weight: 800; color: #b45309; text-align: right;">Rp ${tx.amount.toLocaleString('id-ID')}</td>
+              </tr>
+            `;}).join('')}
+            ${filteredIuranTx.length === 0 ? `
+              <tr>
+                <td colspan="7" style="text-align: center; padding: 25px; color: #94a3b8;">Tidak ada data transaksi iuran sesuai filter.</td>
+              </tr>
+            ` : ''}
+          </tbody>
+          ${filteredIuranTx.length > 0 ? `
+          <tfoot>
+            <tr style="background: #f8fafc; font-weight: 900; border-top: 2px solid #cbd5e1;">
+              <td colspan="6" style="text-align: right; padding: 8px 10px; text-transform: uppercase; font-size: 10px; color: #475569;">Total Nominal (Lunas):</td>
+              <td style="text-align: right; padding: 8px 10px; font-size: 11px; color: #b45309;">Rp ${filteredTotalIuranRevenue.toLocaleString('id-ID')}</td>
+            </tr>
+          </tfoot>
+          ` : ''}
+        </table>
+
+        <div style="margin-top: 35px; display: flex; justify-content: space-between; align-items: flex-end; font-size: 10px;">
+          <div>
+            <p style="margin: 0; color: #94a3b8; font-size: 9px; text-transform: uppercase; font-weight: 800;">Catatan Resmi</p>
+            <p style="margin: 2px 0 0 0; color: #64748b;">Laporan iuran disahkan secara digital oleh Sistem V-Dojang Taekwondo Club.</p>
+          </div>
+          <div style="text-align: center; width: 180px;">
+            <p style="margin: 0; color: #475569; font-weight: 700;">Pengurus V-Dojang</p>
+            <div style="height: 45px;"></div>
+            <p style="margin: 0; font-weight: 900; color: #0f172a; text-decoration: underline;">( Admin / Bendahara )</p>
+          </div>
+        </div>
+      `;
     } else {
       const el = document.getElementById(printAreaId);
       tableContentHtml = el ? el.innerHTML : '';
@@ -1181,8 +1293,9 @@ export default function DashboardAdmin({
         th { background: #f1f5f9; color: #475569; font-weight: 800; padding: 8px 10px; text-align: left; border-bottom: 2px solid #e2e8f0; }
         td { padding: 8px 10px; border-bottom: 1px solid #f1f5f9; color: #334155; }
         tr:nth-child(even) td { background: #f8fafc; }
-        .badge-aktif { background: #ecfdf5; color: #059669; padding: 2px 8px; border-radius: 999px; font-size: 9px; font-weight: 800; display: inline-block; }
-        .badge-nonaktif { background: #fff1f2; color: #e11d48; padding: 2px 8px; border-radius: 999px; font-size: 9px; font-weight: 800; display: inline-block; }
+        .badge-aktif { background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; padding: 2px 8px; border-radius: 999px; font-size: 9px; font-weight: 800; display: inline-block; }
+        .badge-nonaktif { background: #fff1f2; color: #e11d48; border: 1px solid #fecdd3; padding: 2px 8px; border-radius: 999px; font-size: 9px; font-weight: 800; display: inline-block; }
+        .badge-pending { background: #fffbeb; color: #b45309; border: 1px solid #fde68a; padding: 2px 8px; border-radius: 999px; font-size: 9px; font-weight: 800; display: inline-block; }
         @media print { body { margin: 15px; } }
       </style>
       </head><body>
@@ -1416,6 +1529,7 @@ export default function DashboardAdmin({
       case 'laporan-anggota': return 'Laporan Data Anggota';
       case 'laporan-aksesoris': return 'Laporan Penjualan Aksesoris';
       case 'laporan-event': return 'Laporan Event & UKT';
+      case 'laporan-iuran': return 'Laporan Iuran Bulanan Dojang';
       case 'laporan-keuangan': return 'Laporan Keuangan & Total Keseluruhan';
       case 'kegiatan': return 'Kelola Kegiatan & Event';
       case 'sabuk': return 'Kelola Tingkatan Sabuk';
@@ -1574,6 +1688,7 @@ export default function DashboardAdmin({
               {renderSidebarItem('laporan-anggota', 'Anggota', <Users size={14} />, undefined, true)}
               {renderSidebarItem('laporan-aksesoris', 'Penjualan', <BarChart2 size={14} />, undefined, true)}
               {renderSidebarItem('laporan-event', 'Event / UKT', <Trophy size={14} />, undefined, true)}
+              {renderSidebarItem('laporan-iuran', 'Iuran Bulanan', <CreditCard size={14} />, undefined, true)}
               {renderSidebarItem('laporan-keuangan', 'Keuangan/Total', <TrendingUp size={14} />, undefined, true)}
             </div>
           )}
@@ -2643,6 +2758,193 @@ export default function DashboardAdmin({
                       </table>
                       {renderPagination(currentPageLaporanEvent, filteredEventTx.length, setCurrentPageLaporanEvent)}
                     </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* TAB: Laporan Iuran Bulanan */}
+            {activeTab === 'laporan-iuran' && (
+              <div className="space-y-6 bg-white border border-slate-100 p-4 sm:p-6 rounded-2xl shadow-xs animate-fade-in font-sans">
+                {/* Export Buttons */}
+                <div className="flex items-center justify-between flex-wrap gap-3 pb-4 border-b border-slate-100">
+                  <div>
+                    <h3 className="text-sm font-black text-slate-800">Laporan Iuran Bulanan Dojang</h3>
+                    <p className="text-[10px] text-slate-400 mt-0.5">{filteredIuranTx.length} transaksi iuran ditemukan ({iuranTx.length} total)</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => exportToCSV('laporan-iuran-dojang', ['Tanggal', 'Nama Anggota', 'Dojang', 'Deskripsi Periode', 'Nominal (Rp)', 'Status'],
+                        filteredIuranTx.map(tx => [
+                          tx.date,
+                          tx.memberName,
+                          users.find(u => u.id === tx.memberId)?.dojang || '-',
+                          tx.details.split('\n')[0].replace('[Iuran] ', ''),
+                          tx.amount,
+                          tx.status
+                        ])
+                      )}
+                      className="inline-flex items-center gap-1.5 px-3 py-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-xl text-[10px] font-black uppercase tracking-wider transition cursor-pointer"
+                    >
+                      <FileSpreadsheet size={13} />
+                      Export Excel
+                    </button>
+                    <button
+                      onClick={() => exportToPDF('Laporan Iuran Bulanan Dojang', 'print-laporan-iuran')}
+                      className="inline-flex items-center gap-1.5 px-3 py-2 bg-brand-red/8 hover:bg-brand-red/15 text-brand-red border border-brand-red/15 rounded-xl text-[10px] font-black uppercase tracking-wider transition cursor-pointer"
+                    >
+                      <Printer size={13} />
+                      Cetak PDF
+                    </button>
+                  </div>
+                </div>
+
+                {/* Filter Bar */}
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 bg-slate-50 p-4 rounded-xl border border-slate-100">
+                  <div>
+                    <label className="block text-[9px] font-bold text-slate-500 mb-1">Filter Bulan</label>
+                    <select
+                      value={filterIuranMonth}
+                      onChange={e => { setFilterIuranMonth(e.target.value); setCurrentPageLaporanIuran(1); }}
+                      className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white shadow-xs cursor-pointer"
+                    >
+                      <option value="Semua">Semua Bulan</option>
+                      <option value="01">Januari</option>
+                      <option value="02">Februari</option>
+                      <option value="03">Maret</option>
+                      <option value="04">April</option>
+                      <option value="05">Mei</option>
+                      <option value="06">Juni</option>
+                      <option value="07">Juli</option>
+                      <option value="08">Agustus</option>
+                      <option value="09">September</option>
+                      <option value="10">Oktober</option>
+                      <option value="11">November</option>
+                      <option value="12">Desember</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[9px] font-bold text-slate-500 mb-1">Filter Tahun</label>
+                    <select
+                      value={filterIuranYear}
+                      onChange={e => { setFilterIuranYear(e.target.value); setCurrentPageLaporanIuran(1); }}
+                      className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white shadow-xs cursor-pointer"
+                    >
+                      <option value="Semua">Semua Tahun</option>
+                      {Array.from(new Set(transactions.map(t => t.date.split('-')[0]))).sort().map(yr => (
+                        <option key={yr} value={yr}>{yr}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[9px] font-bold text-slate-500 mb-1">Filter Dojang</label>
+                    <select
+                      value={filterIuranDojang}
+                      onChange={e => { setFilterIuranDojang(e.target.value); setCurrentPageLaporanIuran(1); }}
+                      className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white shadow-xs cursor-pointer"
+                    >
+                      <option value="Semua">Semua Dojang</option>
+                      {Array.from(new Set([
+                        ...users.map(u => u.dojang).filter(Boolean) as string[],
+                        ...Object.keys(settings?.dojangFees || {})
+                      ])).sort().map(d => (
+                        <option key={d} value={d}>{d}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[9px] font-bold text-slate-500 mb-1">Filter Status Bayar</label>
+                    <select
+                      value={filterIuranStatus}
+                      onChange={e => { setFilterIuranStatus(e.target.value); setCurrentPageLaporanIuran(1); }}
+                      className="w-full px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold focus:outline-hidden bg-white shadow-xs cursor-pointer"
+                    >
+                      <option value="Semua">Semua Status</option>
+                      <option value="Berhasil">Lunas (Berhasil)</option>
+                      <option value="Pending">Menunggu Verifikasi (Pending)</option>
+                      <option value="Ditolak">Ditolak</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Summary Cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                  <div className="bg-slate-50 border border-slate-100 rounded-xl p-4">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Transaksi Iuran</p>
+                    <p className="text-xl font-black text-slate-800 mt-1">{filteredIuranTx.length} Transaksi</p>
+                  </div>
+                  <div className="bg-amber-50/80 border border-amber-200/60 rounded-xl p-4">
+                    <p className="text-[10px] font-black text-amber-800 uppercase tracking-widest">Total Pendapatan Iuran</p>
+                    <p className="text-xl font-black text-amber-900 mt-1">Rp {filteredTotalIuranRevenue.toLocaleString('id-ID')}</p>
+                  </div>
+                  <div className="bg-emerald-50/80 border border-emerald-200/60 rounded-xl p-4">
+                    <p className="text-[10px] font-black text-emerald-800 uppercase tracking-widest">Iuran Lunas (Berhasil)</p>
+                    <p className="text-xl font-black text-emerald-900 mt-1">
+                      {filteredIuranTx.filter(t => t.status === 'Berhasil').length} Pembayaran
+                    </p>
+                  </div>
+                  <div className="bg-blue-50/80 border border-blue-200/60 rounded-xl p-4">
+                    <p className="text-[10px] font-black text-blue-800 uppercase tracking-widest">Iuran Pending</p>
+                    <p className="text-xl font-black text-blue-900 mt-1">
+                      {filteredIuranTx.filter(t => t.status === 'Pending').length} Pembayaran
+                    </p>
+                  </div>
+                </div>
+
+                {/* Table */}
+                <div id="print-laporan-iuran" className="space-y-3">
+                  <h4 className="font-black text-slate-800 text-xs uppercase tracking-wider">Tabel Log Transaksi Iuran Bulanan</h4>
+                  <div className="border border-slate-100 rounded-xl overflow-x-auto bg-white shadow-xs">
+                    <table className="w-full text-left text-xs border-collapse min-w-[700px]">
+                      <thead>
+                        <tr className="bg-slate-50 text-slate-500 font-extrabold border-b border-slate-100">
+                          <th className="p-3">Tanggal</th>
+                          <th className="p-3">Nama Anggota</th>
+                          <th className="p-3">Dojang</th>
+                          <th className="p-3">Rincian Periode</th>
+                          <th className="p-3">Status</th>
+                          <th className="p-3 text-right">Nominal</th>
+                          <th className="p-3 text-center">Aksi</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filteredIuranTx.slice((currentPageLaporanIuran - 1) * 10, currentPageLaporanIuran * 10).map(tx => {
+                          const userOfTx = users.find(u => u.id === tx.memberId);
+                          return (
+                            <tr key={tx.id} className="border-b border-slate-100 hover:bg-slate-50/20 transition font-semibold text-slate-650">
+                              <td className="p-3">{tx.date}</td>
+                              <td className="p-3 font-bold text-slate-800">{tx.memberName}</td>
+                              <td className="p-3 font-semibold text-slate-600">🏢 {userOfTx?.dojang || '-'}</td>
+                              <td className="p-3">{tx.details.split('\n')[0].replace('[Iuran] ', '')}</td>
+                              <td className="p-3">{renderStatusBadge(tx.status)}</td>
+                              <td className="p-3 text-amber-700 font-extrabold text-right">Rp {tx.amount.toLocaleString('id-ID')}</td>
+                              <td className="p-3 text-center">
+                                {tx.status === 'Berhasil' && (
+                                  <button
+                                    type="button"
+                                    onClick={() => printKwitansi(tx)}
+                                    className="text-[9px] text-emerald-650 hover:text-emerald-700 font-extrabold inline-flex items-center gap-1 border border-emerald-100 bg-emerald-50/30 px-2 py-0.5 rounded-lg hover:bg-emerald-50 transition"
+                                  >
+                                    🧾 Kwitansi
+                                  </button>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                        {filteredIuranTx.length === 0 && (
+                          <tr>
+                            <td colSpan={7} className="text-center py-10 text-slate-400 font-semibold text-xs border-dashed">
+                              Tidak ada data transaksi iuran.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                    {renderPagination(currentPageLaporanIuran, filteredIuranTx.length, setCurrentPageLaporanIuran)}
                   </div>
                 </div>
               </div>
